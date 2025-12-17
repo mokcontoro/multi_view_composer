@@ -77,14 +77,10 @@ from .sample_images import (
     SampleImageContext,
 )
 
-# Backwards compatibility alias
-TeleopImageGenerator = MultiViewComposer
-
 __version__ = "3.0.0"
 __all__ = [
     # Main class
     "MultiViewComposer",
-    "TeleopImageGenerator",  # Backwards compatibility
     # Camera
     "CameraConfig",
     "get_default_camera_configs",
