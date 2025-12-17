@@ -5,7 +5,13 @@ import cv2
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Callable, Optional, Tuple, List
+from typing import Dict, Callable, Optional, Tuple, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .config import LayoutNodeConfig
+else:
+    # Runtime import to avoid circular imports
+    LayoutNodeConfig = None
 
 
 class Direction(Enum):
@@ -215,27 +221,122 @@ def compute_vertical_layout_sizes(
     return root, target_sizes
 
 
+def build_layout_from_config(
+    layout_config: LayoutNodeConfig,
+    camera_sizes: Dict[str, Tuple[int, int]],
+    target_sizes: Dict[str, Tuple[int, int]]
+) -> LayoutNode:
+    """
+    Build a layout tree from a LayoutNodeConfig.
+
+    Args:
+        layout_config: Configuration for the layout tree
+        camera_sizes: Dict mapping camera name to (height, width)
+        target_sizes: Dict to populate with computed target sizes
+
+    Returns:
+        Root LayoutNode of the built tree
+    """
+    if layout_config.camera is not None:
+        # Leaf node - camera
+        camera = layout_config.camera
+        if camera in camera_sizes:
+            height, width = camera_sizes[camera]
+        else:
+            # Default size for unknown cameras
+            height, width = 480, 640
+        target_sizes[camera] = (height, width)
+        return make_camera_node(camera, height, width)
+
+    # Junction node - has children
+    if len(layout_config.children) < 2:
+        raise ValueError("Junction node must have at least 2 children")
+
+    direction = Direction.HORIZONTAL if layout_config.direction == "horizontal" else Direction.VERTICAL
+
+    # Build children recursively
+    child_nodes = []
+    for child_config in layout_config.children:
+        child_node = build_layout_from_config(child_config, camera_sizes, target_sizes)
+        child_nodes.append(child_node)
+
+    # Combine children pairwise from left to right
+    result = child_nodes[0]
+    for i in range(1, len(child_nodes)):
+        result = make_junction_node(result, child_nodes[i], direction, target_sizes)
+
+    return result
+
+
+def compute_layout_from_config(
+    layout_config: LayoutNodeConfig,
+    camera_sizes: Dict[str, Tuple[int, int]]
+) -> Tuple[LayoutNode, Dict[str, Tuple[int, int]]]:
+    """
+    Compute layout sizes from a config.
+
+    Args:
+        layout_config: Configuration for the layout tree
+        camera_sizes: Dict mapping camera name to (height, width)
+
+    Returns:
+        Tuple of (root LayoutNode, dict of camera -> target size)
+    """
+    target_sizes: Dict[str, Tuple[int, int]] = {}
+    root = build_layout_from_config(layout_config, camera_sizes, target_sizes)
+    return root, target_sizes
+
+
 class LayoutManager:
     """Manages layout computation and image concatenation."""
 
-    def __init__(self, camera_sizes: Dict[str, Tuple[int, int]], use_vertical: bool = False):
+    def __init__(
+        self,
+        camera_sizes: Dict[str, Tuple[int, int]],
+        use_vertical: bool = False,
+        layout_configs: Optional[Dict[str, LayoutNodeConfig]] = None,
+        active_layout: str = "horizontal"
+    ):
         """
         Initialize layout manager.
 
         Args:
             camera_sizes: Dict mapping camera name to (height, width) after rotation
-            use_vertical: Whether to also compute vertical layout
+            use_vertical: Whether to also compute vertical layout (legacy mode)
+            layout_configs: Optional dict of layout configs from YAML (new config mode)
+            active_layout: Name of the active layout when using layout_configs
         """
-        self.num_layouts = 2 if use_vertical else 1
-        self.roots: List[Optional[LayoutNode]] = [None] * self.num_layouts
-        self.target_sizes: List[Dict[str, Tuple[int, int]]] = [{} for _ in range(self.num_layouts)]
+        if layout_configs:
+            # New config-based mode
+            self.layout_names = list(layout_configs.keys())
+            self.num_layouts = len(self.layout_names)
+            self.roots: List[Optional[LayoutNode]] = [None] * self.num_layouts
+            self.target_sizes: List[Dict[str, Tuple[int, int]]] = [{} for _ in range(self.num_layouts)]
 
-        # Compute horizontal layout (tree_index=0)
-        self.roots[0], self.target_sizes[0] = compute_horizontal_layout_sizes(camera_sizes)
+            for i, name in enumerate(self.layout_names):
+                self.roots[i], self.target_sizes[i] = compute_layout_from_config(
+                    layout_configs[name], camera_sizes
+                )
 
-        # Compute vertical layout if needed (tree_index=1)
-        if use_vertical:
-            self.roots[1], self.target_sizes[1] = compute_vertical_layout_sizes(camera_sizes)
+            # Set active layout index
+            self.active_layout_index = 0
+            if active_layout in self.layout_names:
+                self.active_layout_index = self.layout_names.index(active_layout)
+        else:
+            # Legacy hardcoded mode
+            self.layout_names = ["horizontal", "vertical"] if use_vertical else ["horizontal"]
+            self.num_layouts = 2 if use_vertical else 1
+            self.roots = [None] * self.num_layouts
+            self.target_sizes = [{} for _ in range(self.num_layouts)]
+
+            # Compute horizontal layout (tree_index=0)
+            self.roots[0], self.target_sizes[0] = compute_horizontal_layout_sizes(camera_sizes)
+
+            # Compute vertical layout if needed (tree_index=1)
+            if use_vertical:
+                self.roots[1], self.target_sizes[1] = compute_vertical_layout_sizes(camera_sizes)
+
+            self.active_layout_index = 0
 
     def get_target_size(self, camera_name: str, tree_index: int = 0) -> Tuple[int, int]:
         """Get the computed target size for a camera."""

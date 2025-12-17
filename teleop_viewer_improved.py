@@ -3,74 +3,43 @@
 Teleop Viewer - Optimized Version
 
 Uses the teleop_view_image_generator package for image processing.
+All settings (layouts, overlays, styling) are configured via YAML config file.
 
+Benchmark Results:
   | Version  | FPS   | ms/frame | Speedup |
   |----------|-------|----------|---------|
-  | Original | 34.9  | 28.63    | 1.0x    |
-  | Improved | 128.8 | 7.77     | 3.7x    |
+  | Original | 20.5  | 48.69    | 1.0x    |
+  | Improved | 56.7  | 17.63    | 2.76x   |
 
-Performance optimizations:
-1. Image caching - decoded images cached, not re-decoded every frame
-2. Pre-allocated buffers - reuse numpy arrays instead of creating new ones
-3. BGR throughout - avoid RGB/BGR conversions (OpenCV native is BGR)
-4. Parallel processing - ThreadPoolExecutor for concurrent image processing
-5. Flattened tree - pre-computed concatenation order, no recursive traversal
-6. Faster resize - INTER_LINEAR interpolation
-7. Reduced allocations - reuse arrays, minimize copies
-8. Inlined operations - reduce function call overhead
+Key Features:
+- Fully configurable text overlays via YAML (templates, colors, conditions)
+- Flexible tree-based layout system
+- Automatic camera filtering (only processes cameras in layout)
+- Parallel image processing with ThreadPoolExecutor
+- Image caching for file-based sources
+- Pre-compiled regex patterns for template rendering
+
+Usage:
+    python teleop_viewer_improved.py                 # Use default config.yaml
+    python teleop_viewer_improved.py -c custom.yaml  # Use custom config
+
+See config.yaml for the full configuration format.
 """
 
 from __future__ import annotations
 import cv2
 import numpy as np
-import yaml
 import logging
 import time
 import os
 import glob
 from typing import Optional, Dict, List
 
-from teleop_view_image_generator import TeleopImageGenerator
+from teleop_view_image_generator import TeleopImageGenerator, load_config as load_viewer_config
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(levelname)s: %(message)s')
 logger = logging.getLogger("Teleop Viewer")
-
-
-def load_config(config_path: str = "config.yaml") -> dict:
-    """Load configuration from YAML file."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_file = os.path.join(script_dir, config_path)
-    if not os.path.exists(config_file):
-        logger.warning(f"Config file not found at {config_file}, using defaults")
-        return get_default_config()
-    with open(config_file, "r") as f:
-        return yaml.safe_load(f)
-
-
-def get_default_config() -> dict:
-    """Return default configuration values."""
-    return {
-        "resolutions": {
-            "ee_cam": [480, 848, 3],
-            "ifm": [800, 1280, 3],
-            "monitor_cam": [720, 1280, 3],
-            "recovery_cam": [530, 848, 3],
-        },
-        "hardware": {"old_elbow_cam": True, "camera_mount": "D"},
-        "use_vertical": False,
-        "input_directory": "./sample_images",
-        "fps": 10,
-        "window_name": "Teleop Viewer",
-        "sensors": {
-            "laser_distance": 35.0,
-            "laser_active": True,
-            "pressure_manifold": 0.5,
-            "pressure_base": 0.3,
-            "robot_status": "SCANNING",
-            "is_manual_review": True,
-        },
-    }
 
 
 class ImageLoader:
@@ -146,27 +115,36 @@ class ImageLoader:
 class TeleopViewer:
     """Teleop viewer using the teleop_view_image_generator package."""
 
-    def __init__(self, config: dict = None):
+    def __init__(self, config_path: str = "config.yaml"):
+        """
+        Initialize the teleop viewer.
+
+        Args:
+            config_path: Path to YAML config file (relative to script or absolute)
+        """
         self.logger = logging.getLogger("TeleopViewer")
-        self.config = config or load_config()
 
-        # Settings
-        self.fps = self.config.get("fps", 10)
-        self.window_name = self.config.get("window_name", "Teleop Viewer")
-        self.use_vertical = self.config.get("use_vertical", False)
+        # Load config from YAML file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if not os.path.isabs(config_path):
+            config_path = os.path.join(script_dir, config_path)
+        self.viewer_config = load_viewer_config(config_path)
 
-        # Initialize the image generator from the package
-        self.generator = TeleopImageGenerator(self.config)
+        # Initialize generator with ViewerConfig
+        self.generator = TeleopImageGenerator(self.viewer_config)
+
+        # Settings from config
+        self.fps = self.viewer_config.fps
+        self.window_name = self.viewer_config.window_name
 
         # Initialize image loader
-        input_dir = self.config.get("input_directory", "./sample_images")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+        input_dir = self.viewer_config.input_directory
         if not os.path.isabs(input_dir):
             input_dir = os.path.join(script_dir, input_dir)
         self.image_loader = ImageLoader(input_dir)
 
         # Set initial sensor values from config
-        sensors = self.config.get("sensors", {})
+        sensors = self.viewer_config.sensors
         self.generator.update_sensor_data(
             laser_distance=sensors.get("laser_distance", 35.0),
             laser_active=sensors.get("laser_active", True),
@@ -240,17 +218,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Teleop Viewer - Optimized Version")
     parser.add_argument("-c", "--config", default="config.yaml", help="Config file path")
-    parser.add_argument("-i", "--input", default=None, help="Input directory")
-    parser.add_argument("--fps", type=float, default=None, help="Frame rate")
     args = parser.parse_args()
 
-    config = load_config(args.config)
-    if args.input:
-        config["input_directory"] = args.input
-    if args.fps:
-        config["fps"] = args.fps
-
-    viewer = TeleopViewer(config)
+    viewer = TeleopViewer(config_path=args.config)
     viewer.run()
 
 

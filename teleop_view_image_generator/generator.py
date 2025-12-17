@@ -5,14 +5,25 @@ import cv2
 import numpy as np
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Union, Set
 
 from .camera import CameraConfig, get_default_camera_configs
 from .overlays import SensorData, draw_camera_overlays, draw_border
 from .layout import LayoutManager, create_placeholder
+from .config import ViewerConfig, load_config, LayoutNodeConfig
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_cameras_from_layout(layout: LayoutNodeConfig) -> Set[str]:
+    """Extract all camera names used in a layout tree."""
+    cameras = set()
+    if layout.camera:
+        cameras.add(layout.camera)
+    for child in layout.children:
+        cameras.update(_get_cameras_from_layout(child))
+    return cameras
 
 
 class TeleopImageGenerator:
@@ -21,46 +32,90 @@ class TeleopImageGenerator:
 
     This class handles:
     - Camera image processing (resize, rotate)
-    - Overlay rendering (status, laser, pressure, centermark)
-    - Layout concatenation (horizontal/vertical)
+    - Overlay rendering (configurable via YAML)
+    - Layout concatenation (configurable via YAML)
 
     Usage:
+        # From YAML file path
+        generator = TeleopImageGenerator("config.yaml")
+
+        # Or from ViewerConfig object
+        config = load_config("config.yaml")
         generator = TeleopImageGenerator(config)
+
+        # Update images and sensor data
         generator.update_camera_image("ee_cam", image, active=True)
         generator.update_sensor_data(laser_distance=35.0, ...)
         frames = generator.generate_frame()
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Union[ViewerConfig, str]):
         """
         Initialize the image generator.
 
         Args:
-            config: Configuration dictionary with keys:
-                - resolutions: dict with camera resolution tuples
-                - hardware: dict with old_elbow_cam (bool), camera_mount (str)
-                - use_vertical: bool for dual layout mode
+            config: Configuration - either:
+                - ViewerConfig: Config object with full overlay/layout settings
+                - str: Path to YAML config file
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.config = config
 
-        # Settings
-        self.use_vertical = config.get("use_vertical", False)
-        self.num_layouts = 2 if self.use_vertical else 1
+        # Load config
+        if isinstance(config, str):
+            self.config = load_config(config)
+        elif isinstance(config, ViewerConfig):
+            self.config = config
+        else:
+            raise TypeError(
+                f"config must be ViewerConfig or str path, got {type(config).__name__}. "
+                "Use load_config('config.yaml') to load from file."
+            )
 
         # Initialize cameras
-        resolutions = config.get("resolutions", {})
-        hardware = config.get("hardware", {})
-        self.cameras: Dict[str, CameraConfig] = get_default_camera_configs(
-            resolutions, hardware, self.num_layouts
-        )
+        resolutions = self.config.resolutions
+        hardware = self.config.hardware
+
+        # Determine number of layouts and which cameras are used
+        if self.config.layouts:
+            self.num_layouts = len(self.config.layouts)
+            # Get cameras actually used in layouts
+            used_cameras: Set[str] = set()
+            for layout in self.config.layouts.values():
+                used_cameras.update(_get_cameras_from_layout(layout))
+        else:
+            self.num_layouts = 2 if self.config.use_vertical else 1
+            used_cameras = None  # Use all cameras
+
+        # Get all camera configs, then filter to only used ones
+        all_cameras = get_default_camera_configs(resolutions, hardware, self.num_layouts)
+
+        if used_cameras is not None:
+            self.cameras: Dict[str, CameraConfig] = {
+                name: cam for name, cam in all_cameras.items()
+                if name in used_cameras
+            }
+        else:
+            self.cameras = all_cameras
 
         # Compute layout and target sizes using tree-based algorithm
         camera_sizes = {
             name: cam.get_effective_resolution()[:2]
             for name, cam in self.cameras.items()
         }
-        self.layout_manager = LayoutManager(camera_sizes, self.use_vertical)
+
+        # Use config-based layouts
+        if self.config.layouts:
+            self.layout_manager = LayoutManager(
+                camera_sizes,
+                layout_configs=self.config.layouts,
+                active_layout=self.config.active_layout
+            )
+        else:
+            # Fallback to default layouts if none defined in config
+            self.layout_manager = LayoutManager(
+                camera_sizes,
+                use_vertical=self.config.use_vertical
+            )
 
         # Update camera target_sizes from computed layout
         for tree_index in range(self.num_layouts):
@@ -179,18 +234,18 @@ class TeleopImageGenerator:
             if cam.rotate is not None:
                 processed = cv2.rotate(processed, cam.rotate)
 
-            # Draw overlays
+            # Draw overlays using config
             draw_camera_overlays(
                 processed,
                 cam.name,
-                cam.overlay_types,
                 self.sensor_data,
+                self.config,
                 tree_index,
                 cam.centermark
             )
 
             # Draw border
-            draw_border(processed)
+            draw_border(processed, self.config.border)
 
             cam.processed_images[tree_index] = processed
 

@@ -30,3 +30,115 @@ sensors:
   pressure_base: 0.3  # bar
   robot_status: "SCANNING"  # Options: Stopped, SCANNING, NAVIGATING, UNLOADING, FINISHED
   is_manual_review: true
+
+# =============================================================================
+# FLEXIBLE TEXT OVERLAY SYSTEM
+# =============================================================================
+
+# Default styling for all text overlays (can be overridden per-overlay)
+default_overlay_style:
+  font: "HERSHEY_SIMPLEX"  # OpenCV font name
+  font_scale: 0.8
+  thickness: 2
+  box_height: 40
+  padding_left: 5
+  padding_top: 30
+  background_color: [0, 0, 0]  # BGR black
+
+# Define text overlays (unlimited - add as many as you need)
+text_overlays:
+  # Status overlay with conditional text and color
+  - id: status
+    template: "Status: {robot_status} ({mode})"
+    cameras: [back_monitor_cam, front_monitor_cam]
+    variables:
+      mode:
+        type: conditional
+        conditions:
+          - when: "{is_manual_review} == true"
+            value: "Manual"
+          - else: "Auto"
+    color_rules:
+      - when: "{is_manual_review} == true"
+        color: [51, 153, 255]  # BGR orange/yellow
+      - when: "{robot_status} == 'ERROR'"
+        color: [0, 0, 255]      # BGR red
+      - else: [255, 128, 0]     # BGR default orange
+
+  # Laser distance with threshold-based formatting
+  - id: laser
+    template: "Dist: {distance_display}"
+    cameras: [back_monitor_cam, ifm_camera2]
+    variables:
+      distance_cm:
+        type: formula
+        expr: "{laser_distance} * 0.1"  # mm to cm
+      distance_display:
+        type: conditional
+        conditions:
+          - when: "{laser_active} == false"
+            value: "N/A"
+          - when: "{distance_cm} > 44"
+            value: "N/A"
+          - else:
+            format: "{distance_cm:.2f}cm"
+    color_rules:
+      - when: "{laser_active} == false"
+        color: [0, 0, 255]      # BGR red
+      - when: "{distance_cm} > 44"
+        color: [0, 0, 255]      # BGR red
+      - when: "{distance_cm} < 31"
+        color: [0, 255, 0]      # BGR green = safe
+      - else: [255, 0, 0]       # BGR blue/red = warning
+
+  # Pressure overlay (two values)
+  - id: pressure
+    template: "Z1: {pressure_manifold:.4f} bar | Z2: {pressure_base:.4f} bar"
+    cameras: [back_monitor_cam, front_monitor_cam]
+    style:
+      font_scale: 0.7  # Smaller font for this overlay
+    color: [255, 128, 0]  # BGR static orange color
+
+# =============================================================================
+# VISUAL ELEMENTS
+# =============================================================================
+
+# Centermark (crosshair) settings
+centermark:
+  enabled: true
+  size_ratio: 0.025  # 2.5% of image width
+  thickness: 4
+  color: [255, 0, 255]  # BGR magenta
+
+# Border settings
+border:
+  enabled: true
+  thickness: 1
+  color: [255, 255, 255]  # BGR white
+
+# =============================================================================
+# LAYOUT CONFIGURATION
+# =============================================================================
+
+# Define named layouts (tree-based structure)
+layouts:
+  horizontal:
+    direction: horizontal
+    children:
+      - direction: horizontal
+        children:
+          - direction: vertical
+            children:
+              - camera: ee_cam
+              - direction: vertical
+                children:
+                  - camera: boxwall_monitor_cam
+                  - camera: ifm_camera1
+          - camera: ifm_camera2
+      - direction: horizontal
+        children:
+          - camera: front_monitor_cam
+          - camera: back_monitor_cam
+
+# Which layout to use
+active_layout: "horizontal"
