@@ -1,4 +1,4 @@
-"""Main TeleopImageGenerator class - core image processing engine."""
+"""Main MultiViewComposer class - core image processing engine."""
 
 from __future__ import annotations
 import cv2
@@ -26,9 +26,9 @@ def _get_cameras_from_layout(layout: LayoutNodeConfig) -> Set[str]:
     return cameras
 
 
-class TeleopImageGenerator:
+class MultiViewComposer:
     """
-    Core image processing engine for teleop viewer - no ROS dependencies.
+    Core image processing engine for multi-view composition.
 
     This class handles:
     - Camera image processing (resize, rotate)
@@ -37,16 +37,16 @@ class TeleopImageGenerator:
 
     Usage:
         # From YAML file path
-        generator = TeleopImageGenerator("config.yaml")
+        composer = MultiViewComposer("config.yaml")
 
         # Or from ViewerConfig object
         config = load_config("config.yaml")
-        generator = TeleopImageGenerator(config)
+        composer = MultiViewComposer(config)
 
-        # Update images and sensor data
-        generator.update_camera_image("ee_cam", image, active=True)
-        generator.update_dynamic_data(laser_distance=35.0, ...)
-        frames = generator.generate_frame()
+        # Update images and dynamic data
+        composer.update_camera_image("ee_cam", image, active=True)
+        composer.update_dynamic_data(laser_distance=35.0, ...)
+        frames = composer.generate_frame()
     """
 
     def __init__(self, config: Union[ViewerConfig, str]):

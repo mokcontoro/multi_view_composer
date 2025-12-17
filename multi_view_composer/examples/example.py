@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Example: Using the teleop_view_image_generator package
+Example: Using the multi_view_composer package
 
-This example demonstrates how to use the TeleopImageGenerator
+This example demonstrates how to use the MultiViewComposer
 with synthetic images (no external image files required).
 
 Usage:
-    python -m teleop_view_image_generator.examples.example
+    python -m multi_view_composer.examples.example
 """
 
 import cv2
@@ -14,7 +14,7 @@ import numpy as np
 import os
 import random
 import time
-from teleop_view_image_generator import TeleopImageGenerator, load_config, ViewerConfig
+from multi_view_composer import MultiViewComposer, load_config, ViewerConfig
 
 
 def create_synthetic_image(height: int, width: int, color: tuple, label: str) -> np.ndarray:
@@ -37,11 +37,11 @@ def main():
 
     if os.path.exists(config_path):
         print(f"Loading config from: {config_path}")
-        generator = TeleopImageGenerator(config_path)
+        composer = MultiViewComposer(config_path)
     else:
         print("Config file not found, using default config")
         # Create minimal config programmatically
-        from teleop_view_image_generator.config import (
+        from multi_view_composer.config import (
             ViewerConfig, OverlayStyle, TextOverlayConfig,
             CentermarkConfig, BorderConfig, LayoutNodeConfig,
             ColorRule, VariableConfig, VariableCondition
@@ -80,7 +80,7 @@ def main():
             },
             active_layout="horizontal",
         )
-        generator = TeleopImageGenerator(config)
+        composer = MultiViewComposer(config)
 
     # Define camera colors for visualization
     camera_colors = {
@@ -93,15 +93,15 @@ def main():
     }
 
     # Create and update synthetic images for each camera
-    print(f"\nCameras in use: {generator.get_camera_names()}")
+    print(f"\nCameras in use: {composer.get_camera_names()}")
 
-    for cam_name in generator.get_camera_names():
-        cam_config = generator.get_camera_config(cam_name)
+    for cam_name in composer.get_camera_names():
+        cam_config = composer.get_camera_config(cam_name)
         if cam_config:
             h, w = cam_config.resolution[:2]
             color = camera_colors.get(cam_name, (100, 100, 100))
             img = create_synthetic_image(h, w, color, cam_name)
-            generator.update_camera_image(cam_name, img, active=True)
+            composer.update_camera_image(cam_name, img, active=True)
 
     # Status options for random selection
     status_options = ["Stopped", "SCANNING", "NAVIGATING", "UNLOADING", "FINISHED"]
@@ -113,7 +113,7 @@ def main():
     start_time = time.time()
 
     while True:
-        # Update sensor data with random values
+        # Update dynamic data with random values
         laser_distance = random.uniform(20.0, 50.0)  # mm
         laser_active = random.random() > 0.1  # 90% chance active
         pressure_manifold = random.uniform(0.3, 0.8)  # bar
@@ -121,7 +121,7 @@ def main():
         robot_status = random.choice(status_options)
         is_manual_review = random.random() > 0.5  # 50% chance
 
-        generator.update_dynamic_data(
+        composer.update_dynamic_data(
             laser_distance=laser_distance,
             laser_active=laser_active,
             pressure_manifold=pressure_manifold,
@@ -131,10 +131,10 @@ def main():
         )
 
         # Generate the output frame
-        frames = generator.generate_frame()
+        frames = composer.generate_frame()
 
         # Display result
-        cv2.imshow("Teleop View Example", frames[0])
+        cv2.imshow("Multi-View Composer Example", frames[0])
 
         frame_count += 1
 
@@ -155,7 +155,7 @@ def main():
     cv2.destroyAllWindows()
 
     # Cleanup
-    generator.shutdown()
+    composer.shutdown()
     print(f"\nDone. Rendered {frame_count} frames.")
 
 

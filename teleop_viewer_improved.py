@@ -35,8 +35,8 @@ import os
 import glob
 from typing import Optional, Dict, List
 
-from teleop_view_image_generator import (
-    TeleopImageGenerator,
+from multi_view_composer import (
+    MultiViewComposer,
     load_config as load_viewer_config,
     generate_sample_images,
     cleanup_sample_images,
@@ -136,8 +136,8 @@ class TeleopViewer:
             config_path = os.path.join(self._script_dir, config_path)
         self.viewer_config = load_viewer_config(config_path)
 
-        # Initialize generator with ViewerConfig
-        self.generator = TeleopImageGenerator(self.viewer_config)
+        # Initialize composer with ViewerConfig
+        self.generator = MultiViewComposer(self.viewer_config)
 
         # Settings from config
         self.fps = self.viewer_config.fps

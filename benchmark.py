@@ -9,7 +9,7 @@ import time
 import cv2
 import argparse
 
-from teleop_view_image_generator import generate_sample_images, cleanup_sample_images
+from multi_view_composer import generate_sample_images, cleanup_sample_images
 
 
 def run_benchmark(num_frames=50, show_display=False):

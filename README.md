@@ -1,6 +1,6 @@
-# Teleop Viewer
+# Multi-View Composer
 
-A high-performance teleop image viewer for robotics applications with multi-camera support, configurable sensor overlays, and flexible YAML-based layouts.
+A high-performance multi-view image composer with configurable text overlays and flexible YAML-based layouts.
 
 ## Features
 
@@ -110,7 +110,7 @@ Only cameras defined in layouts are processed (unused cameras are skipped for pe
 
 ### Available Template Variables
 
-From sensor data:
+From dynamic data:
 - `{laser_distance}` - float (mm)
 - `{laser_active}` - bool
 - `{pressure_manifold}` - float (bar)
@@ -123,34 +123,34 @@ From sensor data:
 Run the example script:
 
 ```bash
-python -m teleop_view_image_generator.examples.example
+python -m multi_view_composer.examples.example
 ```
 
 Programmatic usage:
 
 ```python
-from teleop_view_image_generator import TeleopImageGenerator
+from multi_view_composer import MultiViewComposer
 
-# Create generator from config file
-generator = TeleopImageGenerator("config.yaml")
+# Create composer from config file
+composer = MultiViewComposer("config.yaml")
 
 # Feed camera images
-generator.update_camera_image("ee_cam", cv2_image, active=True)
+composer.update_camera_image("ee_cam", cv2_image, active=True)
 
-# Update sensor data for overlays
-generator.update_sensor_data(
+# Update dynamic data for overlays
+composer.update_dynamic_data(
     laser_distance=25.0,
     robot_status="SCANNING",
 )
 
 # Generate output frame
-frames = generator.generate_frame()
+frames = composer.generate_frame()
 ```
 
 ### Generating Test Images Programmatically
 
 ```python
-from teleop_view_image_generator import generate_sample_images, cleanup_sample_images
+from multi_view_composer import generate_sample_images, cleanup_sample_images
 
 # Generate synthetic test images
 sample_dir = generate_sample_images("./", num_frames=2)
@@ -164,7 +164,7 @@ cleanup_sample_images("./")
 Or use the context manager:
 
 ```python
-from teleop_view_image_generator import SampleImageContext
+from multi_view_composer import SampleImageContext
 
 with SampleImageContext() as sample_dir:
     # Images are available in sample_dir
@@ -177,12 +177,12 @@ with SampleImageContext() as sample_dir:
 ```
 teleop_viewer/
 ├── teleop_viewer_improved.py     # Main viewer application
-├── teleop_view_image_generator/  # Core image processing package
+├── multi_view_composer/          # Core image processing package
 │   ├── __init__.py
-│   ├── generator.py              # TeleopImageGenerator class
+│   ├── generator.py              # MultiViewComposer class
 │   ├── camera.py                 # Camera configurations
 │   ├── layout.py                 # Layout management
-│   ├── overlays.py               # Sensor overlay rendering
+│   ├── overlays.py               # Overlay rendering
 │   ├── config.py                 # Configuration dataclasses
 │   ├── template_engine.py        # Template rendering engine
 │   ├── sample_images.py          # Synthetic image generation
