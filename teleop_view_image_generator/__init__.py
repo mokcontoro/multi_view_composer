@@ -77,7 +77,7 @@ from .sample_images import (
     SampleImageContext,
 )
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = [
     # Main class
     "TeleopImageGenerator",

@@ -9,6 +9,7 @@ A high-performance teleop image viewer for robotics applications with multi-came
 - **Flexible layout system** - define camera arrangements in config
 - Automatic camera filtering - only processes cameras used in layouts
 - Image caching and parallel processing for high performance
+- **On-demand sample image generation** - no static test files needed
 
 ## Installation
 
@@ -19,7 +20,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-# Run the viewer
+# Run the viewer (generates sample images automatically if needed)
 python teleop_viewer_improved.py
 
 # With custom config
@@ -37,7 +38,7 @@ python teleop_viewer_improved.py -c config.yaml
 | Original (`teleop_viewer.py`) | 20.5 | 48.69 | 1.0x |
 | Improved (`teleop_viewer_improved.py`) | 56.7 | 17.63 | **2.76x** |
 
-Run the benchmark:
+Run the benchmark (automatically generates and cleans up test images):
 ```bash
 python benchmark.py -n 50
 ```
@@ -146,6 +147,31 @@ generator.update_sensor_data(
 frames = generator.generate_frame()
 ```
 
+### Generating Test Images Programmatically
+
+```python
+from teleop_view_image_generator import generate_sample_images, cleanup_sample_images
+
+# Generate synthetic test images
+sample_dir = generate_sample_images("./", num_frames=2)
+
+# ... run your tests ...
+
+# Clean up when done
+cleanup_sample_images("./")
+```
+
+Or use the context manager:
+
+```python
+from teleop_view_image_generator import SampleImageContext
+
+with SampleImageContext() as sample_dir:
+    # Images are available in sample_dir
+    # ... run tests ...
+# Images are automatically cleaned up
+```
+
 ## Project Structure
 
 ```
@@ -159,9 +185,9 @@ teleop_viewer/
 │   ├── overlays.py               # Sensor overlay rendering
 │   ├── config.py                 # Configuration dataclasses
 │   ├── template_engine.py        # Template rendering engine
+│   ├── sample_images.py          # Synthetic image generation
 │   └── examples/
 │       └── example.py
 ├── config.yaml                   # Configuration file
-├── benchmark.py                  # Performance benchmark
-└── sample_images/                # Test images
+└── benchmark.py                  # Performance benchmark
 ```
