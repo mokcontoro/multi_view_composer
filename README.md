@@ -46,7 +46,7 @@ python benchmark.py -n 50
 Run the example script with synthetic images (no external files needed):
 
 ```bash
-python -m teleop_view_image_generator.example
+python -m teleop_view_image_generator.examples.example
 ```
 
 This demonstrates how to use `TeleopImageGenerator` programmatically:
@@ -82,7 +82,8 @@ teleop_viewer/
 │   ├── camera.py                 # Camera configurations
 │   ├── layout.py                 # Layout management
 │   ├── overlays.py               # Sensor overlay rendering
-│   └── example.py                # Example with synthetic images
+│   └── examples/                 # Example scripts
+│       └── example.py
 ├── config.yaml                   # Configuration file
 ├── benchmark.py                  # Performance benchmark
 └── sample_images/                # Test images
