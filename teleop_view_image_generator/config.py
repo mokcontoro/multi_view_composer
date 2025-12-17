@@ -196,20 +196,23 @@ class LayoutNodeConfig:
 @dataclass
 class ViewerConfig:
     """Main configuration for the teleop viewer."""
-    # Existing config fields
+    # Camera hardware settings
     resolutions: Dict[str, List[int]] = field(default_factory=dict)
     hardware: Dict[str, Any] = field(default_factory=dict)
-    use_vertical: bool = False
+
+    # Application settings
     input_directory: str = "./sample_images"
     fps: int = 10
     window_name: str = "Teleop Viewer"
     sensors: Dict[str, Any] = field(default_factory=dict)
 
-    # New config fields
+    # Overlay configuration
     default_overlay_style: OverlayStyle = field(default_factory=OverlayStyle)
     text_overlays: List[TextOverlayConfig] = field(default_factory=list)
     centermark: CentermarkConfig = field(default_factory=CentermarkConfig)
     border: BorderConfig = field(default_factory=BorderConfig)
+
+    # Layout configuration
     layouts: Dict[str, LayoutNodeConfig] = field(default_factory=dict)
     active_layout: str = "horizontal"
 
@@ -230,7 +233,6 @@ class ViewerConfig:
         return cls(
             resolutions=data.get("resolutions", {}),
             hardware=data.get("hardware", {}),
-            use_vertical=data.get("use_vertical", False),
             input_directory=data.get("input_directory", "./sample_images"),
             fps=data.get("fps", 10),
             window_name=data.get("window_name", "Teleop Viewer"),

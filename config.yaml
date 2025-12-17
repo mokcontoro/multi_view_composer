@@ -1,5 +1,10 @@
-# Teleop Viewer Configuration (ROS-Independent)
+# =============================================================================
+# TELEOP VIEWER CONFIGURATION
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# CAMERA HARDWARE SETTINGS
+# -----------------------------------------------------------------------------
 # Camera resolutions (height, width, channels)
 resolutions:
   ee_cam: [480, 848, 3]
@@ -9,30 +14,29 @@ resolutions:
 
 # Hardware configuration
 hardware:
-  old_elbow_cam: true
-  camera_mount: "D"  # Camera mount version
+  old_elbow_cam: true      # Affects rotation of ifm_camera2 and back_monitor_cam
+  camera_mount: "D"        # Camera mount version ("D" uses ifm, others use recovery_cam)
 
-# Layout settings
-use_vertical: false
-
-# Input settings
+# -----------------------------------------------------------------------------
+# APPLICATION SETTINGS
+# -----------------------------------------------------------------------------
 input_directory: "./sample_images"
-
-# Display settings
 fps: 10
 window_name: "Teleop Viewer"
 
-# Simulated sensor values (for overlay display)
+# -----------------------------------------------------------------------------
+# SENSOR VALUES (for overlay display)
+# -----------------------------------------------------------------------------
 sensors:
-  laser_distance: 35.0  # in mm (will be displayed as cm)
+  laser_distance: 35.0     # in mm (displayed as cm in overlays)
   laser_active: true
-  pressure_manifold: 0.5  # bar
-  pressure_base: 0.3  # bar
-  robot_status: "SCANNING"  # Options: Stopped, SCANNING, NAVIGATING, UNLOADING, FINISHED
+  pressure_manifold: 0.5   # bar
+  pressure_base: 0.3       # bar
+  robot_status: "SCANNING" # Options: Stopped, SCANNING, NAVIGATING, UNLOADING, FINISHED
   is_manual_review: true
 
 # =============================================================================
-# FLEXIBLE TEXT OVERLAY SYSTEM
+# TEXT OVERLAYS (Fully Configurable)
 # =============================================================================
 
 # Default styling for all text overlays (can be overridden per-overlay)
@@ -103,7 +107,7 @@ text_overlays:
 # VISUAL ELEMENTS
 # =============================================================================
 
-# Centermark (crosshair) settings
+# Centermark (crosshair) - drawn on cameras with centermark enabled
 centermark:
   enabled: true
   size_ratio: 0.025  # 2.5% of image width
@@ -119,8 +123,10 @@ border:
 # =============================================================================
 # LAYOUT CONFIGURATION
 # =============================================================================
+# Define camera arrangements as tree structures.
+# Each layout is a tree of horizontal/vertical containers and camera leaves.
+# Only cameras referenced in the active layout will be processed.
 
-# Define named layouts (tree-based structure)
 layouts:
   horizontal:
     direction: horizontal

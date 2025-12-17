@@ -76,26 +76,22 @@ class TeleopImageGenerator:
         hardware = self.config.hardware
 
         # Determine number of layouts and which cameras are used
-        if self.config.layouts:
-            self.num_layouts = len(self.config.layouts)
-            # Get cameras actually used in layouts
-            used_cameras: Set[str] = set()
-            for layout in self.config.layouts.values():
-                used_cameras.update(_get_cameras_from_layout(layout))
-        else:
-            self.num_layouts = 2 if self.config.use_vertical else 1
-            used_cameras = None  # Use all cameras
+        if not self.config.layouts:
+            raise ValueError("No layouts defined in config. At least one layout is required.")
+
+        self.num_layouts = len(self.config.layouts)
+
+        # Get cameras actually used in layouts
+        used_cameras: Set[str] = set()
+        for layout in self.config.layouts.values():
+            used_cameras.update(_get_cameras_from_layout(layout))
 
         # Get all camera configs, then filter to only used ones
         all_cameras = get_default_camera_configs(resolutions, hardware, self.num_layouts)
-
-        if used_cameras is not None:
-            self.cameras: Dict[str, CameraConfig] = {
-                name: cam for name, cam in all_cameras.items()
-                if name in used_cameras
-            }
-        else:
-            self.cameras = all_cameras
+        self.cameras: Dict[str, CameraConfig] = {
+            name: cam for name, cam in all_cameras.items()
+            if name in used_cameras
+        }
 
         # Compute layout and target sizes using tree-based algorithm
         camera_sizes = {
@@ -103,19 +99,12 @@ class TeleopImageGenerator:
             for name, cam in self.cameras.items()
         }
 
-        # Use config-based layouts
-        if self.config.layouts:
-            self.layout_manager = LayoutManager(
-                camera_sizes,
-                layout_configs=self.config.layouts,
-                active_layout=self.config.active_layout
-            )
-        else:
-            # Fallback to default layouts if none defined in config
-            self.layout_manager = LayoutManager(
-                camera_sizes,
-                use_vertical=self.config.use_vertical
-            )
+        # Create layout manager from config
+        self.layout_manager = LayoutManager(
+            camera_sizes,
+            layout_configs=self.config.layouts,
+            active_layout=self.config.active_layout
+        )
 
         # Update camera target_sizes from computed layout
         for tree_index in range(self.num_layouts):

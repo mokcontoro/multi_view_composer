@@ -3,25 +3,66 @@
 import pytest
 import numpy as np
 
-from teleop_view_image_generator import TeleopImageGenerator, CameraConfig
+from teleop_view_image_generator import (
+    TeleopImageGenerator,
+    CameraConfig,
+    ViewerConfig,
+    LayoutNodeConfig,
+)
+
+
+def create_test_config(num_layouts: int = 1) -> ViewerConfig:
+    """Create a test configuration with layouts."""
+    # Create a simple horizontal layout
+    horizontal_layout = LayoutNodeConfig(
+        direction="horizontal",
+        children=[
+            LayoutNodeConfig(camera="ee_cam"),
+            LayoutNodeConfig(camera="ifm_camera1"),
+            LayoutNodeConfig(camera="ifm_camera2"),
+            LayoutNodeConfig(
+                direction="horizontal",
+                children=[
+                    LayoutNodeConfig(camera="front_monitor_cam"),
+                    LayoutNodeConfig(camera="back_monitor_cam"),
+                ]
+            ),
+        ]
+    )
+
+    layouts = {"horizontal": horizontal_layout}
+
+    # Add vertical layout if requested
+    if num_layouts > 1:
+        vertical_layout = LayoutNodeConfig(
+            direction="vertical",
+            children=[
+                LayoutNodeConfig(camera="ee_cam"),
+                LayoutNodeConfig(camera="ifm_camera2"),
+            ]
+        )
+        layouts["vertical"] = vertical_layout
+
+    return ViewerConfig(
+        resolutions={
+            "ee_cam": [480, 848, 3],
+            "ifm": [800, 1280, 3],
+            "monitor_cam": [720, 1280, 3],
+            "recovery_cam": [530, 848, 3],
+        },
+        hardware={
+            "old_elbow_cam": True,
+            "camera_mount": "D",
+        },
+        layouts=layouts,
+        active_layout="horizontal",
+    )
 
 
 @pytest.fixture
 def default_config():
     """Create default configuration."""
-    return {
-        "resolutions": {
-            "ee_cam": (480, 848, 3),
-            "ifm": (800, 1280, 3),
-            "monitor_cam": (720, 1280, 3),
-            "recovery_cam": (530, 848, 3),
-        },
-        "hardware": {
-            "old_elbow_cam": True,
-            "camera_mount": "D",
-        },
-        "use_vertical": False,
-    }
+    return create_test_config(num_layouts=1)
 
 
 @pytest.fixture
@@ -39,30 +80,46 @@ def sample_image():
 
 
 class TestTeleopImageGeneratorInit:
-    def test_initializes_with_config(self, default_config):
-        gen = TeleopImageGenerator(default_config)
+    def test_initializes_with_config(self):
+        config = create_test_config(num_layouts=1)
+        gen = TeleopImageGenerator(config)
 
         assert gen is not None
-        assert gen.num_layouts == 1  # use_vertical=False
+        assert gen.num_layouts == 1
         gen.shutdown()
 
-    def test_vertical_mode(self, default_config):
-        default_config["use_vertical"] = True
-        gen = TeleopImageGenerator(default_config)
+    def test_multi_layout_mode(self):
+        config = create_test_config(num_layouts=2)
+        gen = TeleopImageGenerator(config)
 
         assert gen.num_layouts == 2
         gen.shutdown()
 
-    def test_initializes_cameras(self, generator):
+    def test_initializes_only_used_cameras(self, generator):
+        """Only cameras referenced in layout should be initialized."""
         cameras = generator.get_camera_names()
 
-        expected_cameras = [
-            "ee_cam", "ifm_camera1", "ifm_camera2",
-            "front_monitor_cam", "back_monitor_cam",
-            "A1_cam1", "A1_cam2", "boxwall_monitor_cam"
-        ]
-        for cam in expected_cameras:
-            assert cam in cameras
+        # These are in the layout
+        assert "ee_cam" in cameras
+        assert "ifm_camera1" in cameras
+        assert "ifm_camera2" in cameras
+        assert "front_monitor_cam" in cameras
+        assert "back_monitor_cam" in cameras
+
+        # These are NOT in the layout (should be filtered out)
+        assert "A1_cam1" not in cameras
+        assert "A1_cam2" not in cameras
+        assert "boxwall_monitor_cam" not in cameras
+
+    def test_raises_error_without_layouts(self):
+        """Should raise error if no layouts defined."""
+        config = ViewerConfig(
+            resolutions={"ee_cam": [480, 848, 3]},
+            hardware={},
+            layouts={},  # Empty layouts
+        )
+        with pytest.raises(ValueError, match="No layouts defined"):
+            TeleopImageGenerator(config)
 
 
 class TestUpdateCameraImage:
@@ -122,9 +179,9 @@ class TestGenerateFrame:
         assert frames[0] is not None
         assert len(frames[0].shape) == 3
 
-    def test_generates_two_frames_vertical_mode(self, default_config, sample_image):
-        default_config["use_vertical"] = True
-        gen = TeleopImageGenerator(default_config)
+    def test_generates_two_frames_multi_layout(self, sample_image):
+        config = create_test_config(num_layouts=2)
+        gen = TeleopImageGenerator(config)
 
         gen.update_camera_image("ee_cam", sample_image, active=True)
         frames = gen.generate_frame()
@@ -156,8 +213,9 @@ class TestGetCameraConfig:
 
 
 class TestShutdown:
-    def test_shutdown_completes(self, default_config):
-        gen = TeleopImageGenerator(default_config)
+    def test_shutdown_completes(self):
+        config = create_test_config()
+        gen = TeleopImageGenerator(config)
         gen.shutdown()
 
         # Should not raise any exceptions

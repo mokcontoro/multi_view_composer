@@ -293,8 +293,7 @@ class LayoutManager:
     def __init__(
         self,
         camera_sizes: Dict[str, Tuple[int, int]],
-        use_vertical: bool = False,
-        layout_configs: Optional[Dict[str, LayoutNodeConfig]] = None,
+        layout_configs: Dict[str, LayoutNodeConfig],
         active_layout: str = "horizontal"
     ):
         """
@@ -302,41 +301,23 @@ class LayoutManager:
 
         Args:
             camera_sizes: Dict mapping camera name to (height, width) after rotation
-            use_vertical: Whether to also compute vertical layout (legacy mode)
-            layout_configs: Optional dict of layout configs from YAML (new config mode)
-            active_layout: Name of the active layout when using layout_configs
+            layout_configs: Dict of layout configs from YAML
+            active_layout: Name of the active layout
         """
-        if layout_configs:
-            # New config-based mode
-            self.layout_names = list(layout_configs.keys())
-            self.num_layouts = len(self.layout_names)
-            self.roots: List[Optional[LayoutNode]] = [None] * self.num_layouts
-            self.target_sizes: List[Dict[str, Tuple[int, int]]] = [{} for _ in range(self.num_layouts)]
+        self.layout_names = list(layout_configs.keys())
+        self.num_layouts = len(self.layout_names)
+        self.roots: List[Optional[LayoutNode]] = [None] * self.num_layouts
+        self.target_sizes: List[Dict[str, Tuple[int, int]]] = [{} for _ in range(self.num_layouts)]
 
-            for i, name in enumerate(self.layout_names):
-                self.roots[i], self.target_sizes[i] = compute_layout_from_config(
-                    layout_configs[name], camera_sizes
-                )
+        for i, name in enumerate(self.layout_names):
+            self.roots[i], self.target_sizes[i] = compute_layout_from_config(
+                layout_configs[name], camera_sizes
+            )
 
-            # Set active layout index
-            self.active_layout_index = 0
-            if active_layout in self.layout_names:
-                self.active_layout_index = self.layout_names.index(active_layout)
-        else:
-            # Legacy hardcoded mode
-            self.layout_names = ["horizontal", "vertical"] if use_vertical else ["horizontal"]
-            self.num_layouts = 2 if use_vertical else 1
-            self.roots = [None] * self.num_layouts
-            self.target_sizes = [{} for _ in range(self.num_layouts)]
-
-            # Compute horizontal layout (tree_index=0)
-            self.roots[0], self.target_sizes[0] = compute_horizontal_layout_sizes(camera_sizes)
-
-            # Compute vertical layout if needed (tree_index=1)
-            if use_vertical:
-                self.roots[1], self.target_sizes[1] = compute_vertical_layout_sizes(camera_sizes)
-
-            self.active_layout_index = 0
+        # Set active layout index
+        self.active_layout_index = 0
+        if active_layout in self.layout_names:
+            self.active_layout_index = self.layout_names.index(active_layout)
 
     def get_target_size(self, camera_name: str, tree_index: int = 0) -> Tuple[int, int]:
         """Get the computed target size for a camera."""
