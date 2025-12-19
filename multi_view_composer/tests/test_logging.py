@@ -1,6 +1,5 @@
 """Tests for logging configuration."""
 
-import pytest
 import logging
 import io
 

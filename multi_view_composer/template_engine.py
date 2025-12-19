@@ -3,9 +3,9 @@
 from __future__ import annotations
 import re
 import operator
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List
 
-from .config import VariableConfig, VariableCondition, ColorRule
+from .config import VariableConfig, ColorRule
 from .logging_config import get_logger
 
 

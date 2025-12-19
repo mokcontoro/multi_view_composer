@@ -1,8 +1,6 @@
 """Tests for config module validation."""
 
 import pytest
-import tempfile
-import os
 
 from multi_view_composer import load_config, ConfigError
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, List, Dict, Tuple, Union, Set, Any
+from typing import Optional, List, Dict, Union, Set, Any
 
 from .camera import CameraConfig, create_camera_configs
 from .overlays import draw_camera_overlays, draw_border

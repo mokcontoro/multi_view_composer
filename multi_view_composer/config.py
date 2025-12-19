@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import yaml
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from .logging_config import get_logger
 
