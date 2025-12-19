@@ -1,9 +1,39 @@
-"""Configuration dataclasses and YAML loader for teleop viewer."""
+"""Configuration dataclasses and YAML loader for multi-view composer."""
 
 from __future__ import annotations
+import os
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any, Union
+
+from .logging_config import get_logger
+
+
+logger = get_logger("config")
+
+
+class ConfigError(Exception):
+    """Exception raised for configuration errors."""
+    pass
+
+
+@dataclass
+class CameraDefinition:
+    """Definition of a camera from config."""
+    name: str
+    resolution: Tuple[int, int]  # (height, width)
+    rotate: Optional[int] = None  # 90, 180, 270, or None
+    centermark: bool = False
+
+    @classmethod
+    def from_dict(cls, name: str, data: Dict) -> CameraDefinition:
+        res = data.get("resolution", [480, 640])
+        return cls(
+            name=name,
+            resolution=(res[0], res[1]),
+            rotate=data.get("rotate"),
+            centermark=data.get("centermark", False),
+        )
 
 
 @dataclass
@@ -195,16 +225,9 @@ class LayoutNodeConfig:
 
 @dataclass
 class ViewerConfig:
-    """Main configuration for the teleop viewer."""
-    # Camera hardware settings
-    resolutions: Dict[str, List[int]] = field(default_factory=dict)
-    hardware: Dict[str, Any] = field(default_factory=dict)
-
-    # Application settings
-    input_directory: str = "./sample_images"
-    fps: int = 10
-    window_name: str = "Teleop Viewer"
-    sensors: Dict[str, Any] = field(default_factory=dict)
+    """Main configuration for the multi-view composer."""
+    # Camera definitions
+    cameras: Dict[str, CameraDefinition] = field(default_factory=dict)
 
     # Overlay configuration
     default_overlay_style: OverlayStyle = field(default_factory=OverlayStyle)
@@ -214,10 +237,16 @@ class ViewerConfig:
 
     # Layout configuration
     layouts: Dict[str, LayoutNodeConfig] = field(default_factory=dict)
-    active_layout: str = "horizontal"
+    active_layout: str = "main"
 
     @classmethod
     def from_dict(cls, data: Dict) -> ViewerConfig:
+        # Parse cameras
+        cameras = {}
+        if "cameras" in data:
+            for name, cam_data in data["cameras"].items():
+                cameras[name] = CameraDefinition.from_dict(name, cam_data)
+
         # Parse text overlays
         text_overlays = []
         if "text_overlays" in data:
@@ -231,80 +260,108 @@ class ViewerConfig:
                 layouts[name] = LayoutNodeConfig.from_dict(layout_data)
 
         return cls(
-            resolutions=data.get("resolutions", {}),
-            hardware=data.get("hardware", {}),
-            input_directory=data.get("input_directory", "./sample_images"),
-            fps=data.get("fps", 10),
-            window_name=data.get("window_name", "Teleop Viewer"),
-            sensors=data.get("sensors", {}),
+            cameras=cameras,
             default_overlay_style=OverlayStyle.from_dict(data.get("default_overlay_style")),
             text_overlays=text_overlays,
             centermark=CentermarkConfig.from_dict(data.get("centermark")),
             border=BorderConfig.from_dict(data.get("border")),
             layouts=layouts,
-            active_layout=data.get("active_layout", "horizontal"),
+            active_layout=data.get("active_layout", "main"),
         )
 
 
 def load_config(config_path: str) -> ViewerConfig:
-    """Load configuration from a YAML file."""
-    with open(config_path, 'r') as f:
-        data = yaml.safe_load(f)
-    return ViewerConfig.from_dict(data)
+    """
+    Load configuration from a YAML file.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        ViewerConfig object with parsed configuration.
+
+    Raises:
+        ConfigError: If file doesn't exist, YAML is invalid, or required fields are missing.
+    """
+    # Check file exists
+    if not os.path.exists(config_path):
+        raise ConfigError(f"Configuration file not found: {config_path}")
+
+    # Load and parse YAML
+    try:
+        with open(config_path, 'r') as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ConfigError(f"Invalid YAML in {config_path}: {e}")
+
+    # Validate data is a dictionary
+    if data is None:
+        raise ConfigError(f"Configuration file is empty: {config_path}")
+    if not isinstance(data, dict):
+        raise ConfigError(f"Configuration must be a YAML mapping, got {type(data).__name__}")
+
+    # Validate required field: layouts
+    if "layouts" not in data or not data["layouts"]:
+        raise ConfigError("Configuration must define at least one layout in 'layouts'")
+
+    # Validate layouts structure
+    for layout_name, layout_data in data["layouts"].items():
+        _validate_layout_node(layout_name, layout_data, path=f"layouts.{layout_name}")
+
+    # Validate active_layout references an existing layout
+    active_layout = data.get("active_layout", "main")
+    if active_layout not in data["layouts"]:
+        available = ", ".join(data["layouts"].keys())
+        raise ConfigError(
+            f"active_layout '{active_layout}' not found. Available layouts: {available}"
+        )
+
+    # Validate text_overlays if present
+    if "text_overlays" in data:
+        for i, overlay in enumerate(data["text_overlays"]):
+            _validate_text_overlay(overlay, path=f"text_overlays[{i}]")
+
+    config = ViewerConfig.from_dict(data)
+    logger.info(f"Loaded config from {config_path}: {len(config.layouts)} layout(s), "
+                f"{len(config.cameras)} camera(s), {len(config.text_overlays)} overlay(s)")
+    return config
 
 
-def get_default_text_overlays() -> List[TextOverlayConfig]:
-    """Get default text overlays matching current hardcoded behavior."""
-    return [
-        TextOverlayConfig(
-            id="status",
-            template="Status: {robot_status} ({mode})",
-            cameras=["back_monitor_cam", "front_monitor_cam"],
-            variables={
-                "mode": VariableConfig(
-                    type="conditional",
-                    conditions=[
-                        VariableCondition(when="{is_manual_review} == true", value="Manual"),
-                        VariableCondition(when=None, value="Auto"),
-                    ]
-                )
-            },
-            color_rules=[
-                ColorRule(color=(51, 153, 255), when="{is_manual_review} == true"),
-                ColorRule(color=(0, 0, 255), when="{robot_status} == 'ERROR'"),
-                ColorRule(color=(255, 128, 0), when=None),  # else
-            ],
-        ),
-        TextOverlayConfig(
-            id="laser",
-            template="Dist: {distance_display}",
-            cameras=["back_monitor_cam", "ifm_camera2"],
-            variables={
-                "distance_cm": VariableConfig(
-                    type="formula",
-                    expr="{laser_distance} * 0.1"
-                ),
-                "distance_display": VariableConfig(
-                    type="conditional",
-                    conditions=[
-                        VariableCondition(when="{laser_active} == false", value="N/A"),
-                        VariableCondition(when="{distance_cm} > 44", value="N/A"),
-                        VariableCondition(when=None, format="{distance_cm:.2f}cm"),
-                    ]
-                ),
-            },
-            color_rules=[
-                ColorRule(color=(0, 0, 255), when="{laser_active} == false"),
-                ColorRule(color=(0, 0, 255), when="{distance_cm} > 44"),
-                ColorRule(color=(0, 255, 0), when="{distance_cm} < 31"),
-                ColorRule(color=(255, 0, 0), when=None),  # else
-            ],
-        ),
-        TextOverlayConfig(
-            id="pressure",
-            template="Z1: {pressure_manifold:.4f} bar | Z2: {pressure_base:.4f} bar",
-            cameras=["back_monitor_cam", "front_monitor_cam"],
-            color=(255, 128, 0),
-            style=OverlayStyle(font_scale=0.7),
-        ),
-    ]
+def _validate_layout_node(name: str, data: Dict, path: str) -> None:
+    """Validate a layout node structure."""
+    if not isinstance(data, dict):
+        raise ConfigError(f"{path}: layout node must be a mapping")
+
+    if "camera" in data:
+        # Leaf node - just needs camera name
+        if not isinstance(data["camera"], str):
+            raise ConfigError(f"{path}.camera: must be a string")
+    else:
+        # Junction node - needs direction and children
+        if "direction" not in data:
+            raise ConfigError(f"{path}: junction node must have 'direction' (horizontal or vertical)")
+
+        direction = data["direction"]
+        if direction not in ("horizontal", "vertical"):
+            raise ConfigError(f"{path}.direction: must be 'horizontal' or 'vertical', got '{direction}'")
+
+        if "children" not in data or not data["children"]:
+            raise ConfigError(f"{path}: junction node must have 'children' list")
+
+        if len(data["children"]) < 2:
+            raise ConfigError(f"{path}.children: must have at least 2 children")
+
+        for i, child in enumerate(data["children"]):
+            _validate_layout_node(name, child, path=f"{path}.children[{i}]")
+
+
+def _validate_text_overlay(data: Dict, path: str) -> None:
+    """Validate a text overlay configuration."""
+    if not isinstance(data, dict):
+        raise ConfigError(f"{path}: text overlay must be a mapping")
+
+    if "id" not in data:
+        raise ConfigError(f"{path}: text overlay must have 'id'")
+
+    if "template" not in data:
+        raise ConfigError(f"{path}: text overlay must have 'template'")

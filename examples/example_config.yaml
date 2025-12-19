@@ -1,0 +1,137 @@
+# =============================================================================
+# EXAMPLE CONFIG - Demonstrates all text overlay features
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CAMERAS - Define cameras with resolution and optional rotation
+# -----------------------------------------------------------------------------
+cameras:
+  cam_top_left:
+    resolution: [240, 320]  # height, width
+  cam_bottom_left:
+    resolution: [240, 320]
+  cam_right:
+    resolution: [480, 320]
+
+# -----------------------------------------------------------------------------
+# LAYOUT - Tree structure with horizontal/vertical splits
+# -----------------------------------------------------------------------------
+# Visual layout:
+#   +----------------+----------------+
+#   |  cam_top_left  |                |
+#   +----------------+   cam_right    |
+#   | cam_bottom_left|                |
+#   +----------------+----------------+
+
+layouts:
+  main:
+    direction: horizontal
+    children:
+      - direction: vertical
+        children:
+          - camera: cam_top_left
+          - camera: cam_bottom_left
+      - camera: cam_right
+
+active_layout: main
+
+# -----------------------------------------------------------------------------
+# TEXT OVERLAYS - All features demonstrated
+# -----------------------------------------------------------------------------
+default_overlay_style:
+  font_scale: 0.6
+  thickness: 2
+  box_height: 30
+  background_color: [30, 30, 30]
+
+text_overlays:
+  # 1. SIMPLE - Static color, direct variable
+  - id: temperature
+    template: "Temp: {temperature:.1f}C"
+    cameras: [cam_top_left, cam_right]
+    color: [255, 200, 100]
+
+  # 2. FORMULA - Computed variable
+  - id: speed
+    template: "Speed: {speed_kmh:.1f} km/h"
+    cameras: [cam_top_left]
+    variables:
+      speed_kmh:
+        type: formula
+        expr: "{speed_ms} * 3.6"
+    color: [100, 255, 100]
+
+  # 3. CONDITIONAL TEXT - Different values based on conditions
+  - id: mode
+    template: "Mode: {mode_text}"
+    cameras: [cam_top_left, cam_bottom_left]
+    variables:
+      mode_text:
+        type: conditional
+        conditions:
+          - when: "{mode} == 'auto'"
+            value: "AUTO"
+          - when: "{mode} == 'manual'"
+            value: "MANUAL"
+          - else: "STANDBY"
+    color: [255, 255, 255]
+
+  # 4. CONDITIONAL COLORS - Color changes by threshold
+  - id: level
+    template: "Level: {level}%"
+    cameras: [cam_bottom_left, cam_right]
+    color_rules:
+      - when: "{level} >= 70"
+        color: [0, 255, 0]
+      - when: "{level} >= 30"
+        color: [0, 200, 255]
+      - else: [0, 0, 255]
+
+  # 5. VISIBILITY - Show only when condition is true
+  - id: warning
+    template: "WARNING: {warning_msg}"
+    cameras: [cam_top_left, cam_bottom_left, cam_right]
+    visible_when: "{show_warning} == true"
+    color: [0, 0, 255]
+    style:
+      font_scale: 0.7
+      background_color: [0, 0, 60]
+
+  # 6. COMBINED - Formula + conditional display + conditional color
+  - id: battery
+    template: "Batt: {batt_display}"
+    cameras: [cam_right]
+    variables:
+      batt_pct:
+        type: formula
+        expr: "{battery_v} / 12.6 * 100"
+      batt_display:
+        type: conditional
+        conditions:
+          - when: "{batt_pct} < 10"
+            value: "LOW!"
+          - else:
+            format: "{batt_pct:.0f}%"
+    color_rules:
+      - when: "{batt_pct} >= 50"
+        color: [0, 255, 0]
+      - when: "{batt_pct} >= 20"
+        color: [0, 165, 255]
+      - else: [0, 0, 255]
+
+# -----------------------------------------------------------------------------
+# VISUAL ELEMENTS
+# -----------------------------------------------------------------------------
+border:
+  enabled: true
+  thickness: 1
+  color: [100, 100, 100]
+
+# Centermark draws a crosshair (+) at the center of camera images.
+# Useful for alignment or aiming (e.g., robot arm cameras).
+# Enable per-camera with `centermark: true` in cameras section.
+centermark:
+  enabled: true           # Master enable/disable
+  size_ratio: 0.025       # Size as % of image width
+  thickness: 4            # Line thickness
+  color: [255, 0, 255]    # BGR color (magenta)

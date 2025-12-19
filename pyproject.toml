@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi_view_composer"
+version = "4.0.0"
+description = "High-performance multi-view image composer with configurable text overlays and flexible YAML-based layouts"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["multi_view_composer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["multi_view_composer/tests"]

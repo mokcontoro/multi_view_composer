@@ -6,6 +6,10 @@ import operator
 from typing import Dict, Any, Tuple, List, Optional
 
 from .config import VariableConfig, VariableCondition, ColorRule
+from .logging_config import get_logger
+
+
+logger = get_logger("template_engine")
 
 
 # Precompiled regex patterns for performance
@@ -141,7 +145,8 @@ def evaluate_formula(expr: str, context: Dict[str, Any]) -> Any:
         # Safe eval with no builtins
         result = eval(substituted, {"__builtins__": {}}, {})
         return result
-    except Exception:
+    except (SyntaxError, NameError, TypeError, ZeroDivisionError) as e:
+        logger.debug(f"Formula evaluation failed for '{expr}': {e}")
         return substituted
 
 

@@ -10,7 +10,15 @@
       "Bash(python:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git remote add:*)",
+      "Bash(git checkout:*)",
+      "Bash(ls:*)",
+      "Bash(git rm:*)",
+      "Bash(git restore:*)",
+      "Bash(timeout:*)",
+      "Bash(git mv:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

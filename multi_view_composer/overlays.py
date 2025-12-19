@@ -2,6 +2,7 @@
 
 import cv2
 import numpy as np
+import threading
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any, Tuple, List
 
@@ -12,11 +13,16 @@ from .config import (
 from .template_engine import (
     build_context, render_template, evaluate_condition, evaluate_color_rules
 )
+from .logging_config import get_logger
 
 
-# Cache for rendered overlay text and colors
+logger = get_logger("overlays")
+
+
+# Thread-safe cache for rendered overlay text and colors
 # Key: (overlay_id, sensor_cache_key) -> (text, color, visible)
 _overlay_cache: Dict[Tuple[str, tuple], Tuple[str, Tuple[int, int, int], bool]] = {}
+_cache_lock = threading.Lock()
 
 
 # OpenCV font mapping
@@ -34,7 +40,7 @@ FONT_MAP = {
 
 @dataclass
 class SensorData:
-    """Sensor data for overlays."""
+    """Sensor data for overlays. Supports both predefined and custom fields."""
     laser_distance: float = 35.0  # mm
     laser_active: bool = True
     pressure_manifold: float = 0.5  # bar
@@ -42,12 +48,28 @@ class SensorData:
     robot_status: str = "Stopped"
     is_manual_review: bool = False
 
+    # Extra fields for custom sensor data
+    _extra: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self._extra is None:
+            self._extra = {}
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a custom sensor value."""
+        self._extra[key] = value
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for template context."""
-        return asdict(self)
+        result = asdict(self)
+        result.pop('_extra', None)  # Remove internal field
+        result.update(self._extra)  # Add custom fields
+        return result
 
     def cache_key(self) -> tuple:
         """Return a hashable key for caching overlay results."""
+        # Include extra fields in cache key (sorted for consistency)
+        extra_items = tuple(sorted(self._extra.items())) if self._extra else ()
         return (
             self.laser_distance,
             self.laser_active,
@@ -55,6 +77,7 @@ class SensorData:
             self.pressure_base,
             self.robot_status,
             self.is_manual_review,
+            extra_items,
         )
 
 
@@ -112,17 +135,17 @@ def _compute_overlay(
     cache_key: tuple
 ) -> Tuple[str, Tuple[int, int, int], bool]:
     """
-    Compute overlay text and color, with caching.
+    Compute overlay text and color, with thread-safe caching.
 
     Returns:
         Tuple of (text, color, visible)
     """
-    global _overlay_cache
-
-    # Check cache first
     full_key = (overlay_config.id, cache_key)
-    if full_key in _overlay_cache:
-        return _overlay_cache[full_key]
+
+    # Check cache first (with lock)
+    with _cache_lock:
+        if full_key in _overlay_cache:
+            return _overlay_cache[full_key]
 
     # Build context from sensor data and overlay variables
     context = build_context(sensor_data, overlay_config.variables)
@@ -134,7 +157,8 @@ def _compute_overlay(
 
     if not visible:
         result = ("", (255, 255, 255), False)
-        _overlay_cache[full_key] = result
+        with _cache_lock:
+            _overlay_cache[full_key] = result
         return result
 
     # Render template
@@ -153,7 +177,8 @@ def _compute_overlay(
         color = (255, 255, 255)
 
     result = (text, color, True)
-    _overlay_cache[full_key] = result
+    with _cache_lock:
+        _overlay_cache[full_key] = result
     return result
 
 

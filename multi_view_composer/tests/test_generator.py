@@ -6,6 +6,7 @@ import numpy as np
 from multi_view_composer import (
     MultiViewComposer,
     CameraConfig,
+    CameraDefinition,
     ViewerConfig,
     LayoutNodeConfig,
 )
@@ -13,49 +14,39 @@ from multi_view_composer import (
 
 def create_test_config(num_layouts: int = 1) -> ViewerConfig:
     """Create a test configuration with layouts."""
+    # Define cameras
+    cameras = {
+        "cam1": CameraDefinition(name="cam1", resolution=(480, 640)),
+        "cam2": CameraDefinition(name="cam2", resolution=(480, 640)),
+        "cam3": CameraDefinition(name="cam3", resolution=(480, 640)),
+    }
+
     # Create a simple horizontal layout
     horizontal_layout = LayoutNodeConfig(
         direction="horizontal",
         children=[
-            LayoutNodeConfig(camera="ee_cam"),
-            LayoutNodeConfig(camera="ifm_camera1"),
-            LayoutNodeConfig(camera="ifm_camera2"),
-            LayoutNodeConfig(
-                direction="horizontal",
-                children=[
-                    LayoutNodeConfig(camera="front_monitor_cam"),
-                    LayoutNodeConfig(camera="back_monitor_cam"),
-                ]
-            ),
+            LayoutNodeConfig(camera="cam1"),
+            LayoutNodeConfig(camera="cam2"),
         ]
     )
 
-    layouts = {"horizontal": horizontal_layout}
+    layouts = {"main": horizontal_layout}
 
     # Add vertical layout if requested
     if num_layouts > 1:
         vertical_layout = LayoutNodeConfig(
             direction="vertical",
             children=[
-                LayoutNodeConfig(camera="ee_cam"),
-                LayoutNodeConfig(camera="ifm_camera2"),
+                LayoutNodeConfig(camera="cam1"),
+                LayoutNodeConfig(camera="cam3"),
             ]
         )
         layouts["vertical"] = vertical_layout
 
     return ViewerConfig(
-        resolutions={
-            "ee_cam": [480, 848, 3],
-            "ifm": [800, 1280, 3],
-            "monitor_cam": [720, 1280, 3],
-            "recovery_cam": [530, 848, 3],
-        },
-        hardware={
-            "old_elbow_cam": True,
-            "camera_mount": "D",
-        },
+        cameras=cameras,
         layouts=layouts,
-        active_layout="horizontal",
+        active_layout="main",
     )
 
 
@@ -76,7 +67,7 @@ def composer(default_config):
 @pytest.fixture
 def sample_image():
     """Create a sample camera image."""
-    return np.random.randint(0, 255, (480, 848, 3), dtype=np.uint8)
+    return np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
 
 
 class TestMultiViewComposerInit:
@@ -100,34 +91,47 @@ class TestMultiViewComposerInit:
         cameras = composer.get_camera_names()
 
         # These are in the layout
-        assert "ee_cam" in cameras
-        assert "ifm_camera1" in cameras
-        assert "ifm_camera2" in cameras
-        assert "front_monitor_cam" in cameras
-        assert "back_monitor_cam" in cameras
+        assert "cam1" in cameras
+        assert "cam2" in cameras
 
-        # These are NOT in the layout (should be filtered out)
-        assert "A1_cam1" not in cameras
-        assert "A1_cam2" not in cameras
-        assert "boxwall_monitor_cam" not in cameras
+        # cam3 is NOT in the single-layout config
+        assert "cam3" not in cameras
 
     def test_raises_error_without_layouts(self):
         """Should raise error if no layouts defined."""
         config = ViewerConfig(
-            resolutions={"ee_cam": [480, 848, 3]},
-            hardware={},
-            layouts={},  # Empty layouts
+            cameras={},
+            layouts={},
         )
         with pytest.raises(ValueError, match="No layouts defined"):
             MultiViewComposer(config)
 
+    def test_auto_creates_cameras_not_in_config(self):
+        """Cameras in layout but not in config should be auto-created."""
+        layouts = {
+            "main": LayoutNodeConfig(
+                direction="horizontal",
+                children=[
+                    LayoutNodeConfig(camera="undefined_cam1"),
+                    LayoutNodeConfig(camera="undefined_cam2"),
+                ]
+            )
+        }
+        config = ViewerConfig(cameras={}, layouts=layouts, active_layout="main")
+        comp = MultiViewComposer(config)
+
+        assert "undefined_cam1" in comp.get_camera_names()
+        cam = comp.get_camera_config("undefined_cam1")
+        assert cam.resolution == (480, 640, 3)  # Default resolution
+        comp.shutdown()
+
 
 class TestUpdateCameraImage:
     def test_updates_existing_camera(self, composer, sample_image):
-        result = composer.update_camera_image("ee_cam", sample_image, active=True)
+        result = composer.update_camera_image("cam1", sample_image, active=True)
 
         assert result is True
-        cam = composer.get_camera_config("ee_cam")
+        cam = composer.get_camera_config("cam1")
         assert cam.active is True
         assert cam.raw_image is not None
 
@@ -137,41 +141,38 @@ class TestUpdateCameraImage:
         assert result is False
 
     def test_sets_inactive(self, composer, sample_image):
-        composer.update_camera_image("ee_cam", sample_image, active=False)
+        composer.update_camera_image("cam1", sample_image, active=False)
 
-        cam = composer.get_camera_config("ee_cam")
+        cam = composer.get_camera_config("cam1")
         assert cam.active is False
 
 
 class TestUpdateDynamicData:
-    def test_updates_laser_distance(self, composer):
-        composer.update_dynamic_data(laser_distance=42.0)
+    def test_updates_custom_data(self, composer):
+        composer.update_dynamic_data(temperature=42.0, my_value=100)
 
-        assert composer.sensor_data.laser_distance == 42.0
-
-    def test_updates_robot_status(self, composer):
-        composer.update_dynamic_data(robot_status="NAVIGATING")
-
-        assert composer.sensor_data.robot_status == "NAVIGATING"
+        data = composer.sensor_data.to_dict()
+        assert data["temperature"] == 42.0
+        assert data["my_value"] == 100
 
     def test_updates_multiple_values(self, composer):
         composer.update_dynamic_data(
-            laser_distance=35.0,
-            laser_active=False,
-            pressure_manifold=0.8,
-            robot_status="SCANNING"
+            speed=35.0,
+            active=False,
+            level=80,
+            status="running"
         )
 
-        assert composer.sensor_data.laser_distance == 35.0
-        assert composer.sensor_data.laser_active is False
-        assert composer.sensor_data.pressure_manifold == 0.8
-        assert composer.sensor_data.robot_status == "SCANNING"
+        data = composer.sensor_data.to_dict()
+        assert data["speed"] == 35.0
+        assert data["active"] is False
+        assert data["level"] == 80
+        assert data["status"] == "running"
 
 
 class TestGenerateFrame:
     def test_generates_single_frame(self, composer, sample_image):
-        # Set up some camera images
-        composer.update_camera_image("ee_cam", sample_image, active=True)
+        composer.update_camera_image("cam1", sample_image, active=True)
 
         frames = composer.generate_frame()
 
@@ -183,14 +184,13 @@ class TestGenerateFrame:
         config = create_test_config(num_layouts=2)
         comp = MultiViewComposer(config)
 
-        comp.update_camera_image("ee_cam", sample_image, active=True)
+        comp.update_camera_image("cam1", sample_image, active=True)
         frames = comp.generate_frame()
 
         assert len(frames) == 2
         comp.shutdown()
 
     def test_handles_no_active_cameras(self, composer):
-        # Don't set any camera images
         frames = composer.generate_frame()
 
         # Should still return frames (with placeholders)
@@ -200,11 +200,11 @@ class TestGenerateFrame:
 
 class TestGetCameraConfig:
     def test_returns_config_for_existing_camera(self, composer):
-        config = composer.get_camera_config("ee_cam")
+        config = composer.get_camera_config("cam1")
 
         assert config is not None
         assert isinstance(config, CameraConfig)
-        assert config.name == "ee_cam"
+        assert config.name == "cam1"
 
     def test_returns_none_for_unknown_camera(self, composer):
         config = composer.get_camera_config("unknown_camera")
@@ -218,5 +218,4 @@ class TestShutdown:
         comp = MultiViewComposer(config)
         comp.shutdown()
 
-        # Should not raise any exceptions
         assert True
