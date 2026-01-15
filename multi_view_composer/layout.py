@@ -16,6 +16,7 @@ else:
 
 class Direction(Enum):
     """Concatenation direction."""
+
     VERTICAL = 0
     HORIZONTAL = 1
 
@@ -23,6 +24,7 @@ class Direction(Enum):
 @dataclass
 class LayoutNode:
     """Node in the layout tree."""
+
     height: int
     width: int
     camera: Optional[str] = None  # Camera name for leaf nodes
@@ -30,7 +32,9 @@ class LayoutNode:
     left: Optional[LayoutNode] = None  # First child (top or left)
     right: Optional[LayoutNode] = None  # Second child (bottom or right)
 
-    def resize(self, new_height: int, new_width: int, target_sizes: Dict[str, Tuple[int, int]]):
+    def resize(
+        self, new_height: int, new_width: int, target_sizes: Dict[str, Tuple[int, int]]
+    ):
         """Recursively resize this node and all children."""
         if self.camera is not None:
             # Leaf node - update target size
@@ -80,7 +84,7 @@ def make_junction_node(
     node1: LayoutNode,
     node2: LayoutNode,
     direction: Direction,
-    target_sizes: Dict[str, Tuple[int, int]]
+    target_sizes: Dict[str, Tuple[int, int]],
 ) -> LayoutNode:
     """
     Create a junction node connecting two nodes.
@@ -125,14 +129,14 @@ def make_junction_node(
         width=total_width,
         direction=direction,
         left=node1,
-        right=node2
+        right=node2,
     )
 
 
 def build_layout_from_config(
     layout_config: LayoutNodeConfig,
     camera_sizes: Dict[str, Tuple[int, int]],
-    target_sizes: Dict[str, Tuple[int, int]]
+    target_sizes: Dict[str, Tuple[int, int]],
 ) -> LayoutNode:
     """
     Build a layout tree from a LayoutNodeConfig.
@@ -160,25 +164,174 @@ def build_layout_from_config(
     if len(layout_config.children) < 2:
         raise ValueError("Junction node must have at least 2 children")
 
-    direction = Direction.HORIZONTAL if layout_config.direction == "horizontal" else Direction.VERTICAL
+    direction = (
+        Direction.HORIZONTAL
+        if layout_config.direction == "horizontal"
+        else Direction.VERTICAL
+    )
 
     # Build children recursively
     child_nodes = []
+    child_weights = []
     for child_config in layout_config.children:
         child_node = build_layout_from_config(child_config, camera_sizes, target_sizes)
         child_nodes.append(child_node)
+        child_weights.append(child_config.weight)
 
-    # Combine children pairwise from left to right
-    result = child_nodes[0]
-    for i in range(1, len(child_nodes)):
-        result = make_junction_node(result, child_nodes[i], direction, target_sizes)
+    # Check if any child has weights specified
+    has_weights = any(w is not None for w in child_weights)
+
+    if has_weights:
+        # Use weighted distribution
+        result = build_weighted_junction(
+            child_nodes, child_weights, direction, target_sizes
+        )
+    else:
+        # Use original pairwise combination
+        result = child_nodes[0]
+        for i in range(1, len(child_nodes)):
+            result = make_junction_node(result, child_nodes[i], direction, target_sizes)
+
+    return result
+
+
+def build_weighted_junction(
+    child_nodes: List[LayoutNode],
+    weights: List[Optional[float]],
+    direction: Direction,
+    target_sizes: Dict[str, Tuple[int, int]],
+) -> LayoutNode:
+    """
+    Build a junction node with weighted size distribution.
+
+    Args:
+        child_nodes: List of child LayoutNodes
+        weights: List of weights (None means auto-calculate based on size)
+        direction: Direction of the junction
+        target_sizes: Dict to update with computed target sizes
+
+    Returns:
+        Root LayoutNode combining all children with weighted sizes
+    """
+    n = len(child_nodes)
+
+    # Calculate natural sizes for children without explicit weights
+    if direction == Direction.HORIZONTAL:
+        # For horizontal: distribute width, match heights
+        ref_height = min(node.height for node in child_nodes)
+        natural_widths = []
+        for node in child_nodes:
+            # Scale width to match reference height
+            scale = ref_height / node.height
+            natural_widths.append(round(node.width * scale))
+        total_natural = sum(natural_widths)
+
+        # Convert weights: None -> proportional to natural size
+        resolved_weights = []
+        for i, w in enumerate(weights):
+            if w is not None:
+                resolved_weights.append(w)
+            else:
+                resolved_weights.append(natural_widths[i] / total_natural)
+
+        # Normalize weights to sum to 1.0
+        weight_sum = sum(resolved_weights)
+        normalized_weights = [w / weight_sum for w in resolved_weights]
+
+        # Calculate total width based on natural sizes and weights
+        # Find the child that constrains the total size the most
+        total_width = 0
+        for i, node in enumerate(child_nodes):
+            scale = ref_height / node.height
+            scaled_width = round(node.width * scale)
+            implied_total = scaled_width / normalized_weights[i]
+            if total_width == 0 or implied_total < total_width:
+                total_width = int(implied_total)
+
+        # Distribute width according to weights
+        allocated_widths = []
+        remaining = total_width
+        for i in range(n - 1):
+            w = round(total_width * normalized_weights[i])
+            allocated_widths.append(w)
+            remaining -= w
+        allocated_widths.append(remaining)  # Last child gets remainder
+
+        # Resize all children to their allocated sizes
+        for i, node in enumerate(child_nodes):
+            node.resize(ref_height, allocated_widths[i], target_sizes)
+
+        # Build the result by combining nodes pairwise
+        result = child_nodes[0]
+        for i in range(1, n):
+            result = LayoutNode(
+                height=ref_height,
+                width=result.width + child_nodes[i].width,
+                direction=Direction.HORIZONTAL,
+                left=result,
+                right=child_nodes[i],
+            )
+
+    else:  # VERTICAL
+        # For vertical: distribute height, match widths
+        ref_width = min(node.width for node in child_nodes)
+        natural_heights = []
+        for node in child_nodes:
+            # Scale height to match reference width
+            scale = ref_width / node.width
+            natural_heights.append(round(node.height * scale))
+        total_natural = sum(natural_heights)
+
+        # Convert weights: None -> proportional to natural size
+        resolved_weights = []
+        for i, w in enumerate(weights):
+            if w is not None:
+                resolved_weights.append(w)
+            else:
+                resolved_weights.append(natural_heights[i] / total_natural)
+
+        # Normalize weights to sum to 1.0
+        weight_sum = sum(resolved_weights)
+        normalized_weights = [w / weight_sum for w in resolved_weights]
+
+        # Calculate total height based on natural sizes and weights
+        total_height = 0
+        for i, node in enumerate(child_nodes):
+            scale = ref_width / node.width
+            scaled_height = round(node.height * scale)
+            implied_total = scaled_height / normalized_weights[i]
+            if total_height == 0 or implied_total < total_height:
+                total_height = int(implied_total)
+
+        # Distribute height according to weights
+        allocated_heights = []
+        remaining = total_height
+        for i in range(n - 1):
+            h = round(total_height * normalized_weights[i])
+            allocated_heights.append(h)
+            remaining -= h
+        allocated_heights.append(remaining)  # Last child gets remainder
+
+        # Resize all children to their allocated sizes
+        for i, node in enumerate(child_nodes):
+            node.resize(allocated_heights[i], ref_width, target_sizes)
+
+        # Build the result by combining nodes pairwise
+        result = child_nodes[0]
+        for i in range(1, n):
+            result = LayoutNode(
+                height=result.height + child_nodes[i].height,
+                width=ref_width,
+                direction=Direction.VERTICAL,
+                left=result,
+                right=child_nodes[i],
+            )
 
     return result
 
 
 def compute_layout_from_config(
-    layout_config: LayoutNodeConfig,
-    camera_sizes: Dict[str, Tuple[int, int]]
+    layout_config: LayoutNodeConfig, camera_sizes: Dict[str, Tuple[int, int]]
 ) -> Tuple[LayoutNode, Dict[str, Tuple[int, int]]]:
     """
     Compute layout sizes from a config.
@@ -202,7 +355,7 @@ class LayoutManager:
         self,
         camera_sizes: Dict[str, Tuple[int, int]],
         layout_configs: Dict[str, LayoutNodeConfig],
-        active_layout: str = "horizontal"
+        active_layout: str = "horizontal",
     ):
         """
         Initialize layout manager.
@@ -215,7 +368,9 @@ class LayoutManager:
         self.layout_names = list(layout_configs.keys())
         self.num_layouts = len(self.layout_names)
         self.roots: List[Optional[LayoutNode]] = [None] * self.num_layouts
-        self.target_sizes: List[Dict[str, Tuple[int, int]]] = [{} for _ in range(self.num_layouts)]
+        self.target_sizes: List[Dict[str, Tuple[int, int]]] = [
+            {} for _ in range(self.num_layouts)
+        ]
 
         for i, name in enumerate(self.layout_names):
             self.roots[i], self.target_sizes[i] = compute_layout_from_config(
@@ -232,9 +387,7 @@ class LayoutManager:
         return self.target_sizes[tree_index].get(camera_name, (480, 640))
 
     def concatenate(
-        self,
-        get_image: Callable[[str], np.ndarray],
-        tree_index: int = 0
+        self, get_image: Callable[[str], np.ndarray], tree_index: int = 0
     ) -> np.ndarray:
         """Concatenate images using the pre-computed layout tree."""
         if self.roots[tree_index] is not None:
@@ -251,10 +404,14 @@ def vconcat_resize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
     if w1 != w2:
         if w1 > w2:
             scale = w2 / w1
-            img1 = cv2.resize(img1, (w2, int(h1 * scale)), interpolation=cv2.INTER_LINEAR)
+            img1 = cv2.resize(
+                img1, (w2, int(h1 * scale)), interpolation=cv2.INTER_LINEAR
+            )
         else:
             scale = w1 / w2
-            img2 = cv2.resize(img2, (w1, int(h2 * scale)), interpolation=cv2.INTER_LINEAR)
+            img2 = cv2.resize(
+                img2, (w1, int(h2 * scale)), interpolation=cv2.INTER_LINEAR
+            )
 
     return cv2.vconcat([img1, img2])
 
@@ -267,10 +424,14 @@ def hconcat_resize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
     if h1 != h2:
         if h1 > h2:
             scale = h2 / h1
-            img1 = cv2.resize(img1, (int(w1 * scale), h2), interpolation=cv2.INTER_LINEAR)
+            img1 = cv2.resize(
+                img1, (int(w1 * scale), h2), interpolation=cv2.INTER_LINEAR
+            )
         else:
             scale = h1 / h2
-            img2 = cv2.resize(img2, (int(w2 * scale), h1), interpolation=cv2.INTER_LINEAR)
+            img2 = cv2.resize(
+                img2, (int(w2 * scale), h1), interpolation=cv2.INTER_LINEAR
+            )
 
     return cv2.hconcat([img1, img2])
 
