@@ -46,6 +46,7 @@ class OverlayStyle:
     font_scale: float = 0.8
     thickness: int = 2
     box_height: int = 40
+    box_width: Optional[int] = None  # None = extend to right edge of image
     padding_left: int = 5
     padding_top: int = 30
     background_color: Tuple[int, int, int] = (0, 0, 0)
@@ -59,6 +60,7 @@ class OverlayStyle:
             font_scale=data.get("font_scale", 0.8),
             thickness=data.get("thickness", 2),
             box_height=data.get("box_height", 40),
+            box_width=data.get("box_width"),  # None = extend to right edge
             padding_left=data.get("padding_left", 5),
             padding_top=data.get("padding_top", 30),
             background_color=tuple(data.get("background_color", [0, 0, 0])),
@@ -139,6 +141,7 @@ class TextOverlayConfig:
     id: str
     template: str
     cameras: List[str]
+    position: Tuple[int, int] = (0, 0)  # (x, y) position for overlay
     variables: Dict[str, VariableConfig] = field(default_factory=dict)
     color_rules: List[ColorRule] = field(default_factory=list)
     color: Optional[Tuple[int, int, int]] = None  # static color
@@ -165,10 +168,14 @@ class TextOverlayConfig:
         if "style" in data:
             style = OverlayStyle.from_dict(data["style"])
 
+        # Parse position [x, y], default to (0, 0)
+        position = tuple(data.get("position", [0, 0]))
+
         return cls(
             id=data["id"],
             template=data["template"],
             cameras=data.get("cameras", []),
+            position=position,
             variables=variables,
             color_rules=color_rules,
             color=static_color,
