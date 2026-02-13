@@ -6,11 +6,17 @@ import threading
 from typing import Dict, Any, Tuple
 
 from .config import (
-    ViewerConfig, TextOverlayConfig, OverlayStyle,
-    CentermarkConfig, BorderConfig
+    ViewerConfig,
+    TextOverlayConfig,
+    OverlayStyle,
+    CentermarkConfig,
+    BorderConfig,
 )
 from .template_engine import (
-    build_context, render_template, evaluate_condition, evaluate_color_rules
+    build_context,
+    render_template,
+    evaluate_condition,
+    evaluate_color_rules,
 )
 from .logging_config import get_logger
 
@@ -52,7 +58,7 @@ def draw_text_box(
     text: str,
     y_offset: int,
     color: Tuple[int, int, int],
-    style: OverlayStyle
+    style: OverlayStyle,
 ) -> None:
     """
     Draw a text box with background on image (in-place).
@@ -69,11 +75,7 @@ def draw_text_box(
 
     # Draw background rectangle
     cv2.rectangle(
-        img,
-        (0, y_offset),
-        (w, y_offset + style.box_height),
-        style.background_color,
-        -1
+        img, (0, y_offset), (w, y_offset + style.box_height), style.background_color, -1
     )
 
     # Draw text
@@ -86,14 +88,12 @@ def draw_text_box(
         style.font_scale,
         color,
         style.thickness,
-        cv2.LINE_AA
+        cv2.LINE_AA,
     )
 
 
 def _compute_overlay(
-    overlay_config: TextOverlayConfig,
-    sensor_data: Dict[str, Any],
-    cache_key: tuple
+    overlay_config: TextOverlayConfig, sensor_data: Dict[str, Any], cache_key: tuple
 ) -> Tuple[str, Tuple[int, int, int], bool]:
     """
     Compute overlay text and color, with thread-safe caching.
@@ -130,9 +130,7 @@ def _compute_overlay(
         color = overlay_config.color
     elif overlay_config.color_rules:
         color = evaluate_color_rules(
-            overlay_config.color_rules,
-            context,
-            default_color=(255, 255, 255)
+            overlay_config.color_rules, context, default_color=(255, 255, 255)
         )
     else:
         color = (255, 255, 255)
@@ -149,7 +147,7 @@ def draw_text_overlay(
     sensor_data: Dict[str, Any],
     y_offset: int,
     default_style: OverlayStyle,
-    cache_key: tuple = None
+    cache_key: tuple = None,
 ) -> int:
     """
     Draw a single text overlay based on config.
@@ -185,9 +183,7 @@ def draw_text_overlay(
             color = overlay_config.color
         elif overlay_config.color_rules:
             color = evaluate_color_rules(
-                overlay_config.color_rules,
-                context,
-                default_color=(255, 255, 255)
+                overlay_config.color_rules, context, default_color=(255, 255, 255)
             )
         else:
             color = (255, 255, 255)
@@ -204,10 +200,7 @@ def draw_text_overlay(
     return y_offset + style.box_height
 
 
-def draw_centermark(
-    img: np.ndarray,
-    config: CentermarkConfig
-) -> None:
+def draw_centermark(img: np.ndarray, config: CentermarkConfig) -> None:
     """
     Draw crosshair centermark on image (in-place).
 
@@ -225,10 +218,7 @@ def draw_centermark(
     cv2.line(img, (cx, cy - size), (cx, cy + size), config.color, config.thickness)
 
 
-def draw_border(
-    img: np.ndarray,
-    config: BorderConfig
-) -> None:
+def draw_border(img: np.ndarray, config: BorderConfig) -> None:
     """
     Draw border around image (in-place).
 
@@ -249,7 +239,7 @@ def draw_camera_overlays(
     dynamic_data: Dict[str, Any],
     config: ViewerConfig,
     tree_index: int = 0,
-    draw_centermark_flag: bool = False
+    draw_centermark_flag: bool = False,
 ) -> None:
     """
     Draw all configured overlays on a camera image (in-place).
@@ -284,5 +274,5 @@ def draw_camera_overlays(
                 dynamic_data,
                 y_offset,
                 config.default_overlay_style,
-                cache_key
+                cache_key,
             )

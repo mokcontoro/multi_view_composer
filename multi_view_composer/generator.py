@@ -73,7 +73,9 @@ class MultiViewComposer:
 
         # Validate config
         if not self.config.layouts:
-            raise ValueError("No layouts defined in config. At least one layout is required.")
+            raise ValueError(
+                "No layouts defined in config. At least one layout is required."
+            )
 
         self.num_layouts = len(self.config.layouts)
 
@@ -109,7 +111,7 @@ class MultiViewComposer:
         self.layout_manager = LayoutManager(
             camera_sizes,
             layout_configs=self.config.layouts,
-            active_layout=self.config.active_layout
+            active_layout=self.config.active_layout,
         )
 
         # Update camera target_sizes from computed layout
@@ -125,14 +127,13 @@ class MultiViewComposer:
         # Thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=4)
 
-        self._logger.info(f"Initialized with {len(self.cameras)} cameras, "
-                        f"{self.num_layouts} layout(s)")
+        self._logger.info(
+            f"Initialized with {len(self.cameras)} cameras, "
+            f"{self.num_layouts} layout(s)"
+        )
 
     def update_camera_image(
-        self,
-        camera_name: str,
-        image: np.ndarray,
-        active: bool = True
+        self, camera_name: str, image: np.ndarray, active: bool = True
     ) -> bool:
         """
         Update a camera's raw image.
@@ -191,7 +192,8 @@ class MultiViewComposer:
             target_h, target_w = cam.target_sizes[tree_index][:2]
 
             # Compute resize dimensions (before rotation)
-            if cam.rotate is not None:
+            # Only swap dimensions for 90/270 rotation (not 180)
+            if cam.rotate in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
                 resize_w, resize_h = target_h, target_w
             else:
                 resize_w, resize_h = target_w, target_h
@@ -199,8 +201,7 @@ class MultiViewComposer:
             # Resize with fast interpolation
             if img.shape[:2] != (resize_h, resize_w):
                 processed = cv2.resize(
-                    img, (resize_w, resize_h),
-                    interpolation=cv2.INTER_LINEAR
+                    img, (resize_w, resize_h), interpolation=cv2.INTER_LINEAR
                 )
             else:
                 processed = img.copy()
@@ -216,7 +217,7 @@ class MultiViewComposer:
                 self.dynamic_data,
                 self.config,
                 tree_index,
-                cam.centermark
+                cam.centermark,
             )
 
             # Draw border
@@ -226,11 +227,7 @@ class MultiViewComposer:
 
         return True
 
-    def _get_processed_image(
-        self,
-        camera_name: str,
-        tree_index: int
-    ) -> np.ndarray:
+    def _get_processed_image(self, camera_name: str, tree_index: int) -> np.ndarray:
         """
         Get processed image for a camera, or placeholder if not available.
 
@@ -262,8 +259,7 @@ class MultiViewComposer:
         # Process all cameras in parallel
         camera_names = list(self.cameras.keys())
         futures = [
-            self.executor.submit(self._process_camera, name)
-            for name in camera_names
+            self.executor.submit(self._process_camera, name) for name in camera_names
         ]
         for f in futures:
             f.result()  # Wait for completion
@@ -271,6 +267,7 @@ class MultiViewComposer:
         # Generate output for each layout using the layout manager
         outputs = []
         for tree_index in range(self.num_layouts):
+
             def get_image(name: str, ti=tree_index) -> np.ndarray:
                 return self._get_processed_image(name, ti)
 
@@ -295,7 +292,7 @@ class MultiViewComposer:
     def __del__(self):
         """Cleanup on deletion."""
         try:
-            if hasattr(self, 'executor'):
+            if hasattr(self, "executor"):
                 self.executor.shutdown(wait=False)
         except (RuntimeError, AttributeError):
             # RuntimeError: can occur if interpreter is shutting down

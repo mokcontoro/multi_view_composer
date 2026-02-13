@@ -13,22 +13,23 @@ logger = get_logger("template_engine")
 
 
 # Precompiled regex patterns for performance
-_VAR_PATTERN = re.compile(r'\{(\w+)\}')
-_TEMPLATE_PATTERN = re.compile(r'\{(\w+)(:[^}]+)?\}')
+_VAR_PATTERN = re.compile(r"\{(\w+)\}")
+_TEMPLATE_PATTERN = re.compile(r"\{(\w+)(:[^}]+)?\}")
 
 # Supported operators for safe expression evaluation (ordered by length for correct matching)
 OPERATORS = {
-    '==': operator.eq,
-    '!=': operator.ne,
-    '<=': operator.le,
-    '>=': operator.ge,
-    '<': operator.lt,
-    '>': operator.gt,
+    "==": operator.eq,
+    "!=": operator.ne,
+    "<=": operator.le,
+    ">=": operator.ge,
+    "<": operator.lt,
+    ">": operator.gt,
 }
 
 
 def _substitute_variables(expr: str, context: Dict[str, Any]) -> str:
     """Replace {variable} placeholders with their values from context."""
+
     def replace_var(match):
         var_name = match.group(1)
         if var_name in context:
@@ -80,9 +81,9 @@ def evaluate_condition(expr: str, context: Dict[str, Any]) -> bool:
 
     # Handle simple boolean variable
     substituted = substituted.strip()
-    if substituted.lower() == 'true':
+    if substituted.lower() == "true":
         return True
-    if substituted.lower() == 'false':
+    if substituted.lower() == "false":
         return False
 
     # Try to get as boolean from context
@@ -94,19 +95,20 @@ def _parse_value(value_str: str, context: Dict[str, Any]) -> Any:
     value_str = value_str.strip()
 
     # Boolean literals
-    if value_str.lower() == 'true':
+    if value_str.lower() == "true":
         return True
-    if value_str.lower() == 'false':
+    if value_str.lower() == "false":
         return False
 
     # String literals (quoted)
-    if (value_str.startswith("'") and value_str.endswith("'")) or \
-       (value_str.startswith('"') and value_str.endswith('"')):
+    if (value_str.startswith("'") and value_str.endswith("'")) or (
+        value_str.startswith('"') and value_str.endswith('"')
+    ):
         return value_str[1:-1]
 
     # Try numeric
     try:
-        if '.' in value_str:
+        if "." in value_str:
             return float(value_str)
         return int(value_str)
     except ValueError:
@@ -133,8 +135,8 @@ def evaluate_formula(expr: str, context: Dict[str, Any]) -> Any:
     substituted = _substitute_variables(expr, context)
 
     # Only allow safe characters
-    allowed = set('0123456789.+-*/ ()')
-    if not all(c in allowed for c in substituted.replace(' ', '')):
+    allowed = set("0123456789.+-*/ ()")
+    if not all(c in allowed for c in substituted.replace(" ", "")):
         # Contains unsafe characters, return as-is
         try:
             return float(substituted)
@@ -164,7 +166,7 @@ def resolve_variable(var_config: VariableConfig, context: Dict[str, Any]) -> Any
     if var_config.type == "direct":
         # Direct reference to a context variable
         if var_config.expr:
-            var_name = var_config.expr.strip('{}')
+            var_name = var_config.expr.strip("{}")
             return context.get(var_name, var_config.expr)
         return None
 
@@ -212,9 +214,10 @@ def render_template(template: str, context: Dict[str, Any]) -> str:
     Returns:
         Rendered string
     """
+
     def replace_placeholder(match):
         full_match = match.group(0)  # e.g., "{distance_cm:.2f}"
-        var_name = match.group(1)     # e.g., "distance_cm"
+        var_name = match.group(1)  # e.g., "distance_cm"
         format_spec = match.group(2)  # e.g., ":.2f" or None
 
         if var_name not in context:
@@ -237,7 +240,7 @@ def render_template(template: str, context: Dict[str, Any]) -> str:
 def evaluate_color_rules(
     rules: List[ColorRule],
     context: Dict[str, Any],
-    default_color: Tuple[int, int, int] = (255, 255, 255)
+    default_color: Tuple[int, int, int] = (255, 255, 255),
 ) -> Tuple[int, int, int]:
     """
     Evaluate color rules and return the first matching color.
@@ -262,8 +265,7 @@ def evaluate_color_rules(
 
 
 def build_context(
-    sensor_data: Dict[str, Any],
-    variables: Dict[str, VariableConfig]
+    sensor_data: Dict[str, Any], variables: Dict[str, VariableConfig]
 ) -> Dict[str, Any]:
     """
     Build a context dictionary from sensor data and computed variables.

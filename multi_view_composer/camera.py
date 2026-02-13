@@ -20,6 +20,7 @@ ROTATION_MAP = {
 @dataclass
 class CameraConfig:
     """Runtime configuration for a single camera."""
+
     name: str
     resolution: Tuple[int, int, int]  # (height, width, channels)
     rotate: Optional[int]  # cv2 rotation constant or None
@@ -34,15 +35,14 @@ class CameraConfig:
     processed_images: List[Optional[np.ndarray]] = field(default_factory=list)
 
     def get_effective_resolution(self) -> Tuple[int, int, int]:
-        """Get resolution after rotation."""
-        if self.rotate is not None:
+        """Get resolution after rotation (only 90/270 swap dimensions)."""
+        if self.rotate in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
             return (self.resolution[1], self.resolution[0], self.resolution[2])
         return self.resolution
 
 
 def create_camera_configs(
-    camera_definitions: Dict[str, CameraDefinition],
-    num_layouts: int = 1
+    camera_definitions: Dict[str, CameraDefinition], num_layouts: int = 1
 ) -> Dict[str, CameraConfig]:
     """
     Create camera configs from definitions.
