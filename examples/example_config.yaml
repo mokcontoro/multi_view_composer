@@ -3,15 +3,22 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# CAMERAS - Define cameras with resolution and optional rotation
+# CAMERAS - Define cameras with resolution, optional rotation, and title
 # -----------------------------------------------------------------------------
 cameras:
   cam_top_left:
     resolution: [240, 320]  # height, width
+    title:
+      text: "Top Left Camera"
+      opacity: 0.5  # 50% opacity (default)
   cam_bottom_left:
     resolution: [240, 320]
+    title: "Bottom Left"  # Simple string form (uses default 50% opacity)
   cam_right:
     resolution: [480, 320]
+    title:
+      text: "Right Camera"
+      opacity: 0.7  # 70% opacity for darker background
 
 # -----------------------------------------------------------------------------
 # LAYOUT - Tree structure with horizontal/vertical splits
