@@ -6,11 +6,17 @@ import threading
 from typing import Dict, Any, Tuple
 
 from .config import (
-    ViewerConfig, TextOverlayConfig, OverlayStyle,
-    CentermarkConfig, BorderConfig
+    ViewerConfig,
+    TextOverlayConfig,
+    OverlayStyle,
+    CentermarkConfig,
+    BorderConfig,
 )
 from .template_engine import (
-    build_context, render_template, evaluate_condition, evaluate_color_rules
+    build_context,
+    render_template,
+    evaluate_condition,
+    evaluate_color_rules,
 )
 from .logging_config import get_logger
 
@@ -50,9 +56,10 @@ def get_cv_font(font_name: str) -> int:
 def draw_text_box(
     img: np.ndarray,
     text: str,
+    x_offset: int,
     y_offset: int,
     color: Tuple[int, int, int],
-    style: OverlayStyle
+    style: OverlayStyle,
 ) -> None:
     """
     Draw a text box with background on image (in-place).
@@ -60,40 +67,46 @@ def draw_text_box(
     Args:
         img: BGR image to draw on (modified in-place)
         text: Text to render
-        y_offset: Y position offset
+        x_offset: X position offset (left edge of box)
+        y_offset: Y position offset (top edge of box)
         color: Text color (BGR)
         style: OverlayStyle configuration
     """
     h, w = img.shape[:2]
     font = get_cv_font(style.font)
 
+    # Calculate box right edge
+    if style.box_width is not None:
+        box_right = x_offset + style.box_width
+    else:
+        box_right = w  # Extend to right edge of image
+
     # Draw background rectangle
     cv2.rectangle(
         img,
-        (0, y_offset),
-        (w, y_offset + style.box_height),
+        (x_offset, y_offset),
+        (box_right, y_offset + style.box_height),
         style.background_color,
-        -1
+        -1,
     )
 
-    # Draw text
+    # Draw text (relative to box position)
+    text_x = x_offset + style.padding_left
     text_y = y_offset + style.padding_top
     cv2.putText(
         img,
         text,
-        (style.padding_left, text_y),
+        (text_x, text_y),
         font,
         style.font_scale,
         color,
         style.thickness,
-        cv2.LINE_AA
+        cv2.LINE_AA,
     )
 
 
 def _compute_overlay(
-    overlay_config: TextOverlayConfig,
-    sensor_data: Dict[str, Any],
-    cache_key: tuple
+    overlay_config: TextOverlayConfig, sensor_data: Dict[str, Any], cache_key: tuple
 ) -> Tuple[str, Tuple[int, int, int], bool]:
     """
     Compute overlay text and color, with thread-safe caching.
@@ -130,9 +143,7 @@ def _compute_overlay(
         color = overlay_config.color
     elif overlay_config.color_rules:
         color = evaluate_color_rules(
-            overlay_config.color_rules,
-            context,
-            default_color=(255, 255, 255)
+            overlay_config.color_rules, context, default_color=(255, 255, 255)
         )
     else:
         color = (255, 255, 255)
@@ -147,10 +158,9 @@ def draw_text_overlay(
     img: np.ndarray,
     overlay_config: TextOverlayConfig,
     sensor_data: Dict[str, Any],
-    y_offset: int,
     default_style: OverlayStyle,
-    cache_key: tuple = None
-) -> int:
+    cache_key: tuple = None,
+) -> None:
     """
     Draw a single text overlay based on config.
 
@@ -158,13 +168,12 @@ def draw_text_overlay(
         img: BGR image to draw on (modified in-place)
         overlay_config: Overlay configuration
         sensor_data: Dictionary of sensor values
-        y_offset: Current Y position offset
         default_style: Default overlay style
         cache_key: Optional cache key for sensor data (enables caching)
-
-    Returns:
-        New y_offset after this overlay
     """
+    # Get position from config
+    x_offset, y_offset = overlay_config.position
+
     # Compute text and color (with caching if cache_key provided)
     if cache_key is not None:
         text, color, visible = _compute_overlay(overlay_config, sensor_data, cache_key)
@@ -177,7 +186,7 @@ def draw_text_overlay(
             visible = evaluate_condition(overlay_config.visible_when, context)
 
         if not visible:
-            return y_offset
+            return
 
         text = render_template(overlay_config.template, context)
 
@@ -185,29 +194,22 @@ def draw_text_overlay(
             color = overlay_config.color
         elif overlay_config.color_rules:
             color = evaluate_color_rules(
-                overlay_config.color_rules,
-                context,
-                default_color=(255, 255, 255)
+                overlay_config.color_rules, context, default_color=(255, 255, 255)
             )
         else:
             color = (255, 255, 255)
 
     if not visible:
-        return y_offset
+        return
 
     # Get style (overlay-specific or default)
     style = overlay_config.style if overlay_config.style else default_style
 
-    # Draw the text box
-    draw_text_box(img, text, y_offset, color, style)
-
-    return y_offset + style.box_height
+    # Draw the text box at specified position
+    draw_text_box(img, text, x_offset, y_offset, color, style)
 
 
-def draw_centermark(
-    img: np.ndarray,
-    config: CentermarkConfig
-) -> None:
+def draw_centermark(img: np.ndarray, config: CentermarkConfig) -> None:
     """
     Draw crosshair centermark on image (in-place).
 
@@ -225,10 +227,7 @@ def draw_centermark(
     cv2.line(img, (cx, cy - size), (cx, cy + size), config.color, config.thickness)
 
 
-def draw_border(
-    img: np.ndarray,
-    config: BorderConfig
-) -> None:
+def draw_border(img: np.ndarray, config: BorderConfig) -> None:
     """
     Draw border around image (in-place).
 
@@ -249,7 +248,7 @@ def draw_camera_overlays(
     dynamic_data: Dict[str, Any],
     config: ViewerConfig,
     tree_index: int = 0,
-    draw_centermark_flag: bool = False
+    draw_centermark_flag: bool = False,
 ) -> None:
     """
     Draw all configured overlays on a camera image (in-place).
@@ -273,16 +272,13 @@ def draw_camera_overlays(
     # Get cache key for caching template rendering
     cache_key = make_cache_key(dynamic_data)
 
-    y_offset = 0
-
     # Draw each configured overlay that targets this camera
     for overlay in config.text_overlays:
         if camera_name in overlay.cameras:
-            y_offset = draw_text_overlay(
+            draw_text_overlay(
                 img,
                 overlay,
                 dynamic_data,
-                y_offset,
                 config.default_overlay_style,
-                cache_key
+                cache_key,
             )

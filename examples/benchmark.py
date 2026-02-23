@@ -21,7 +21,11 @@ def create_test_image(height: int, width: int, label: str) -> np.ndarray:
     """Create a test image with a label."""
     # Generate unique color based on label hash
     h = hash(label)
-    color = ((h & 0xFF) // 3 + 40, ((h >> 8) & 0xFF) // 3 + 40, ((h >> 16) & 0xFF) // 3 + 40)
+    color = (
+        (h & 0xFF) // 3 + 40,
+        ((h >> 8) & 0xFF) // 3 + 40,
+        ((h >> 16) & 0xFF) // 3 + 40,
+    )
     img = np.full((height, width, 3), color, dtype=np.uint8)
     return img
 
@@ -96,7 +100,12 @@ def run_benchmark(num_frames: int = 50, config_path: str = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark multi_view_composer")
     parser.add_argument("-n", "--frames", type=int, default=50, help="Number of frames")
-    parser.add_argument("-c", "--config", default=None, help="Config file (default: example_config.yaml)")
+    parser.add_argument(
+        "-c",
+        "--config",
+        default=None,
+        help="Config file (default: example_config.yaml)",
+    )
     args = parser.parse_args()
 
     run_benchmark(args.frames, args.config)

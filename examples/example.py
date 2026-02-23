@@ -91,7 +91,7 @@ def main():
             fps = frame_count / (time.time() - start_time)
             print(f"Frame {frame_count} | FPS: {fps:.1f}")
 
-        if cv2.waitKey(100) & 0xFF in (ord('q'), 27):
+        if cv2.waitKey(100) & 0xFF in (ord("q"), 27):
             break
 
     cv2.destroyAllWindows()

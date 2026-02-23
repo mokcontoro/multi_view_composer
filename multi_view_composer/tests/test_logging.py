@@ -23,9 +23,7 @@ class TestSetupLogging:
         stream = io.StringIO()
         handler = logging.StreamHandler(stream)
         logger = setup_logging(
-            level=logging.INFO,
-            format_string="TEST: %(message)s",
-            handler=handler
+            level=logging.INFO, format_string="TEST: %(message)s", handler=handler
         )
         logger.info("hello")
         output = stream.getvalue()

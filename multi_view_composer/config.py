@@ -14,12 +14,14 @@ logger = get_logger("config")
 
 class ConfigError(Exception):
     """Exception raised for configuration errors."""
+
     pass
 
 
 @dataclass
 class CameraDefinition:
     """Definition of a camera from config."""
+
     name: str
     resolution: Tuple[int, int]  # (height, width)
     rotate: Optional[int] = None  # 90, 180, 270, or None
@@ -39,10 +41,12 @@ class CameraDefinition:
 @dataclass
 class OverlayStyle:
     """Style configuration for text overlays."""
+
     font: str = "HERSHEY_SIMPLEX"
     font_scale: float = 0.8
     thickness: int = 2
     box_height: int = 40
+    box_width: Optional[int] = None  # None = extend to right edge of image
     padding_left: int = 5
     padding_top: int = 30
     background_color: Tuple[int, int, int] = (0, 0, 0)
@@ -56,6 +60,7 @@ class OverlayStyle:
             font_scale=data.get("font_scale", 0.8),
             thickness=data.get("thickness", 2),
             box_height=data.get("box_height", 40),
+            box_width=data.get("box_width"),  # None = extend to right edge
             padding_left=data.get("padding_left", 5),
             padding_top=data.get("padding_top", 30),
             background_color=tuple(data.get("background_color", [0, 0, 0])),
@@ -65,6 +70,7 @@ class OverlayStyle:
 @dataclass
 class ColorRule:
     """A conditional color rule."""
+
     color: Tuple[int, int, int]
     when: Optional[str] = None  # condition expression, None means 'else'
 
@@ -78,6 +84,7 @@ class ColorRule:
 @dataclass
 class VariableCondition:
     """A single condition for conditional variables."""
+
     when: Optional[str]  # None means 'else'
     value: Optional[str] = None
     format: Optional[str] = None
@@ -86,9 +93,12 @@ class VariableCondition:
 @dataclass
 class VariableConfig:
     """Configuration for a computed variable."""
+
     type: str  # "direct", "formula", "conditional"
     expr: Optional[str] = None  # for formula type
-    conditions: List[VariableCondition] = field(default_factory=list)  # for conditional type
+    conditions: List[VariableCondition] = field(
+        default_factory=list
+    )  # for conditional type
 
     @classmethod
     def from_dict(cls, data: Union[Dict, str]) -> VariableConfig:
@@ -103,17 +113,23 @@ class VariableConfig:
         if "conditions" in data:
             for cond in data["conditions"]:
                 if "else" in cond:
-                    conditions.append(VariableCondition(
-                        when=None,
-                        value=cond.get("else") if isinstance(cond.get("else"), str) else None,
-                        format=cond.get("format")
-                    ))
+                    conditions.append(
+                        VariableCondition(
+                            when=None,
+                            value=cond.get("else")
+                            if isinstance(cond.get("else"), str)
+                            else None,
+                            format=cond.get("format"),
+                        )
+                    )
                 else:
-                    conditions.append(VariableCondition(
-                        when=cond.get("when"),
-                        value=cond.get("value"),
-                        format=cond.get("format")
-                    ))
+                    conditions.append(
+                        VariableCondition(
+                            when=cond.get("when"),
+                            value=cond.get("value"),
+                            format=cond.get("format"),
+                        )
+                    )
 
         return cls(type=var_type, expr=expr, conditions=conditions)
 
@@ -121,9 +137,11 @@ class VariableConfig:
 @dataclass
 class TextOverlayConfig:
     """Configuration for a single text overlay."""
+
     id: str
     template: str
     cameras: List[str]
+    position: Tuple[int, int] = (0, 0)  # (x, y) position for overlay
     variables: Dict[str, VariableConfig] = field(default_factory=dict)
     color_rules: List[ColorRule] = field(default_factory=list)
     color: Optional[Tuple[int, int, int]] = None  # static color
@@ -150,10 +168,14 @@ class TextOverlayConfig:
         if "style" in data:
             style = OverlayStyle.from_dict(data["style"])
 
+        # Parse position [x, y], default to (0, 0)
+        position = tuple(data.get("position", [0, 0]))
+
         return cls(
             id=data["id"],
             template=data["template"],
             cameras=data.get("cameras", []),
+            position=position,
             variables=variables,
             color_rules=color_rules,
             color=static_color,
@@ -165,6 +187,7 @@ class TextOverlayConfig:
 @dataclass
 class CentermarkConfig:
     """Configuration for centermark overlay."""
+
     enabled: bool = True
     size_ratio: float = 0.025
     thickness: int = 4
@@ -185,6 +208,7 @@ class CentermarkConfig:
 @dataclass
 class BorderConfig:
     """Configuration for border overlay."""
+
     enabled: bool = True
     thickness: int = 1
     color: Tuple[int, int, int] = (255, 255, 255)
@@ -203,14 +227,19 @@ class BorderConfig:
 @dataclass
 class LayoutNodeConfig:
     """Configuration for a layout tree node."""
+
     direction: Optional[str] = None  # "horizontal" or "vertical"
     camera: Optional[str] = None  # camera name for leaf nodes
     children: List[LayoutNodeConfig] = field(default_factory=list)
+    weight: Optional[float] = None  # weight for proportional sizing (0.0-1.0)
 
     @classmethod
     def from_dict(cls, data: Dict) -> LayoutNodeConfig:
         if "camera" in data:
-            return cls(camera=data["camera"])
+            return cls(
+                camera=data["camera"],
+                weight=data.get("weight"),
+            )
 
         children = []
         if "children" in data:
@@ -220,12 +249,14 @@ class LayoutNodeConfig:
         return cls(
             direction=data.get("direction"),
             children=children,
+            weight=data.get("weight"),
         )
 
 
 @dataclass
 class ViewerConfig:
     """Main configuration for the multi-view composer."""
+
     # Camera definitions
     cameras: Dict[str, CameraDefinition] = field(default_factory=dict)
 
@@ -261,7 +292,9 @@ class ViewerConfig:
 
         return cls(
             cameras=cameras,
-            default_overlay_style=OverlayStyle.from_dict(data.get("default_overlay_style")),
+            default_overlay_style=OverlayStyle.from_dict(
+                data.get("default_overlay_style")
+            ),
             text_overlays=text_overlays,
             centermark=CentermarkConfig.from_dict(data.get("centermark")),
             border=BorderConfig.from_dict(data.get("border")),
@@ -289,7 +322,7 @@ def load_config(config_path: str) -> ViewerConfig:
 
     # Load and parse YAML
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError as e:
         raise ConfigError(f"Invalid YAML in {config_path}: {e}")
@@ -298,7 +331,9 @@ def load_config(config_path: str) -> ViewerConfig:
     if data is None:
         raise ConfigError(f"Configuration file is empty: {config_path}")
     if not isinstance(data, dict):
-        raise ConfigError(f"Configuration must be a YAML mapping, got {type(data).__name__}")
+        raise ConfigError(
+            f"Configuration must be a YAML mapping, got {type(data).__name__}"
+        )
 
     # Validate required field: layouts
     if "layouts" not in data or not data["layouts"]:
@@ -322,8 +357,10 @@ def load_config(config_path: str) -> ViewerConfig:
             _validate_text_overlay(overlay, path=f"text_overlays[{i}]")
 
     config = ViewerConfig.from_dict(data)
-    logger.info(f"Loaded config from {config_path}: {len(config.layouts)} layout(s), "
-                f"{len(config.cameras)} camera(s), {len(config.text_overlays)} overlay(s)")
+    logger.info(
+        f"Loaded config from {config_path}: {len(config.layouts)} layout(s), "
+        f"{len(config.cameras)} camera(s), {len(config.text_overlays)} overlay(s)"
+    )
     return config
 
 
@@ -339,11 +376,15 @@ def _validate_layout_node(name: str, data: Dict, path: str) -> None:
     else:
         # Junction node - needs direction and children
         if "direction" not in data:
-            raise ConfigError(f"{path}: junction node must have 'direction' (horizontal or vertical)")
+            raise ConfigError(
+                f"{path}: junction node must have 'direction' (horizontal or vertical)"
+            )
 
         direction = data["direction"]
         if direction not in ("horizontal", "vertical"):
-            raise ConfigError(f"{path}.direction: must be 'horizontal' or 'vertical', got '{direction}'")
+            raise ConfigError(
+                f"{path}.direction: must be 'horizontal' or 'vertical', got '{direction}'"
+            )
 
         if "children" not in data or not data["children"]:
             raise ConfigError(f"{path}: junction node must have 'children' list")

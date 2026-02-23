@@ -11,7 +11,7 @@ _PACKAGE_NAME = "multi_view_composer"
 def setup_logging(
     level: int = logging.INFO,
     format_string: Optional[str] = None,
-    handler: Optional[logging.Handler] = None
+    handler: Optional[logging.Handler] = None,
 ) -> logging.Logger:
     """
     Configure logging for the multi_view_composer package.

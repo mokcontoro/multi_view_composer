@@ -27,7 +27,7 @@ def create_test_config(num_layouts: int = 1) -> ViewerConfig:
         children=[
             LayoutNodeConfig(camera="cam1"),
             LayoutNodeConfig(camera="cam2"),
-        ]
+        ],
     )
 
     layouts = {"main": horizontal_layout}
@@ -39,7 +39,7 @@ def create_test_config(num_layouts: int = 1) -> ViewerConfig:
             children=[
                 LayoutNodeConfig(camera="cam1"),
                 LayoutNodeConfig(camera="cam3"),
-            ]
+            ],
         )
         layouts["vertical"] = vertical_layout
 
@@ -114,7 +114,7 @@ class TestMultiViewComposerInit:
                 children=[
                     LayoutNodeConfig(camera="undefined_cam1"),
                     LayoutNodeConfig(camera="undefined_cam2"),
-                ]
+                ],
             )
         }
         config = ViewerConfig(cameras={}, layouts=layouts, active_layout="main")
@@ -156,10 +156,7 @@ class TestUpdateDynamicData:
 
     def test_updates_multiple_values(self, composer):
         composer.update_dynamic_data(
-            speed=35.0,
-            active=False,
-            level=80,
-            status="running"
+            speed=35.0, active=False, level=80, status="running"
         )
 
         assert composer.dynamic_data["speed"] == 35.0
