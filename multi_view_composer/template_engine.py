@@ -41,12 +41,13 @@ def _substitute_variables(expr: str, context: Dict[str, Any]) -> str:
 
 def evaluate_condition(expr: str, context: Dict[str, Any]) -> bool:
     """
-    Safely evaluate a condition expression.
+    Safely evaluate a condition expression with logical operators.
 
-    Supports expressions like:
-    - "{laser_distance} > 44"
-    - "{is_manual_review} == true"
-    - "{robot_status} == 'ERROR'"
+    Supports:
+    - Simple: "{laser_distance} > 44"
+    - AND:    "{robot_status} == 'SCANNING' & {is_manual_review}"
+    - OR:     "{status} == 'A' | {status} == 'B'"
+    - Also accepts 'and' / 'or' as aliases for '&' / '|'.
 
     Args:
         expr: Condition expression string
@@ -58,22 +59,38 @@ def evaluate_condition(expr: str, context: Dict[str, Any]) -> bool:
     if not expr:
         return True
 
-    # Substitute variables first
+    # Handle OR (lowest precedence) — split on ' | ' or ' or '
+    or_parts = _split_logical(expr, (" | ", " or "))
+    if len(or_parts) > 1:
+        return any(evaluate_condition(part, context) for part in or_parts)
+
+    # Handle AND — split on ' & ' or ' and '
+    and_parts = _split_logical(expr, (" & ", " and "))
+    if len(and_parts) > 1:
+        return all(evaluate_condition(part, context) for part in and_parts)
+
+    # Single comparison — evaluate directly
+    return _evaluate_single_condition(expr, context)
+
+
+def _split_logical(expr: str, delimiters: Tuple[str, ...]) -> List[str]:
+    """Split expression on any of the given delimiters."""
+    for delim in delimiters:
+        if delim in expr:
+            return [p.strip() for p in expr.split(delim)]
+    return [expr]
+
+
+def _evaluate_single_condition(expr: str, context: Dict[str, Any]) -> bool:
+    """Evaluate a single comparison expression (no logical ops)."""
     substituted = _substitute_variables(expr, context)
 
-    # Find operator
     for op_str, op_func in OPERATORS.items():
         if op_str in substituted:
             parts = substituted.split(op_str, 1)
             if len(parts) == 2:
-                left = parts[0].strip()
-                right = parts[1].strip()
-
-                # Parse left side
-                left_val = _parse_value(left, context)
-                # Parse right side
-                right_val = _parse_value(right, context)
-
+                left_val = _parse_value(parts[0].strip(), context)
+                right_val = _parse_value(parts[1].strip(), context)
                 try:
                     return op_func(left_val, right_val)
                 except (TypeError, ValueError):
@@ -86,7 +103,6 @@ def evaluate_condition(expr: str, context: Dict[str, Any]) -> bool:
     if substituted.lower() == "false":
         return False
 
-    # Try to get as boolean from context
     return bool(context.get(substituted, False))
 
 
