@@ -22,7 +22,12 @@ Example usage:
 
 from .generator import MultiViewComposer
 from .camera import CameraConfig, create_camera_configs
-from .overlays import draw_centermark, draw_camera_overlays, draw_border
+from .overlays import (
+    draw_centermark,
+    draw_camera_overlays,
+    draw_border,
+    draw_camera_title,
+)
 from .layout import (
     LayoutManager,
     LayoutNode,
@@ -42,6 +47,7 @@ from .config import (
     VariableConfig,
     CentermarkConfig,
     BorderConfig,
+    TitleConfig,
     LayoutNodeConfig,
     ConfigError,
     load_config,
@@ -68,6 +74,7 @@ __all__ = [
     "draw_centermark",
     "draw_camera_overlays",
     "draw_border",
+    "draw_camera_title",
     # Layout
     "LayoutManager",
     "LayoutNode",
@@ -86,6 +93,7 @@ __all__ = [
     "VariableConfig",
     "CentermarkConfig",
     "BorderConfig",
+    "TitleConfig",
     "LayoutNodeConfig",
     "ConfigError",
     "load_config",

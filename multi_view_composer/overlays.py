@@ -11,6 +11,7 @@ from .config import (
     OverlayStyle,
     CentermarkConfig,
     BorderConfig,
+    TitleConfig,
 )
 from .template_engine import (
     build_context,
@@ -242,6 +243,70 @@ def draw_border(img: np.ndarray, config: BorderConfig) -> None:
     cv2.rectangle(img, (0, 0), (w - 1, h - 1), config.color, config.thickness)
 
 
+def draw_camera_title(
+    img: np.ndarray,
+    title_config: TitleConfig,
+    default_style: OverlayStyle,
+) -> None:
+    """
+    Draw camera title at bottom left with semi-transparent background.
+
+    Args:
+        img: BGR image to draw on (modified in-place)
+        title_config: Title configuration with text and opacity
+        default_style: Default overlay style for font settings
+    """
+    if not title_config or not title_config.text:
+        return
+
+    h, w = img.shape[:2]
+    font = get_cv_font(default_style.font)
+    text = title_config.text
+
+    # Get text size for box dimensions
+    (text_width, text_height), baseline = cv2.getTextSize(
+        text, font, default_style.font_scale, default_style.thickness
+    )
+
+    # Calculate box dimensions with padding
+    padding_x = 8
+    padding_y = 6
+    box_width = text_width + 2 * padding_x
+    box_height = text_height + baseline + 2 * padding_y
+
+    # Position at bottom left with small margin
+    margin = 5
+    box_x = margin
+    box_y = h - box_height - margin
+
+    # Draw semi-transparent background box
+    overlay = img.copy()
+    cv2.rectangle(
+        overlay,
+        (box_x, box_y),
+        (box_x + box_width, box_y + box_height),
+        default_style.background_color,
+        -1,
+    )
+    cv2.addWeighted(
+        overlay, title_config.opacity, img, 1 - title_config.opacity, 0, img
+    )
+
+    # Draw text on top of the blended background
+    text_x = box_x + padding_x
+    text_y = box_y + padding_y + text_height
+    cv2.putText(
+        img,
+        text,
+        (text_x, text_y),
+        font,
+        default_style.font_scale,
+        (255, 255, 255),  # White text
+        default_style.thickness,
+        cv2.LINE_AA,
+    )
+
+
 def draw_camera_overlays(
     img: np.ndarray,
     camera_name: str,
@@ -249,6 +314,7 @@ def draw_camera_overlays(
     config: ViewerConfig,
     tree_index: int = 0,
     draw_centermark_flag: bool = False,
+    title_config: TitleConfig = None,
 ) -> None:
     """
     Draw all configured overlays on a camera image (in-place).
@@ -260,14 +326,19 @@ def draw_camera_overlays(
         config: ViewerConfig with overlay settings
         tree_index: Layout index (overlays only on index 0)
         draw_centermark_flag: Whether to draw centermark
+        title_config: Optional title configuration for the camera
     """
     # Draw centermark if requested
     if draw_centermark_flag:
         draw_centermark(img, config.centermark)
 
-    # Only draw text overlays on tree_index 0
+    # Only draw text overlays and title on tree_index 0
     if tree_index != 0:
         return
+
+    # Draw camera title if configured
+    if title_config and title_config.text:
+        draw_camera_title(img, title_config, config.default_overlay_style)
 
     # Get cache key for caching template rendering
     cache_key = make_cache_key(dynamic_data)

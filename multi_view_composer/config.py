@@ -19,6 +19,25 @@ class ConfigError(Exception):
 
 
 @dataclass
+class TitleConfig:
+    """Configuration for camera title overlay."""
+
+    text: str = ""  # Empty by default (nothing displayed if not specified)
+    opacity: float = 0.5  # Background box opacity (0.0-1.0), default 50%
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict]) -> Optional[TitleConfig]:
+        if data is None:
+            return None
+        if isinstance(data, str):
+            return cls(text=data)
+        return cls(
+            text=data.get("text", ""),
+            opacity=data.get("opacity", 0.5),
+        )
+
+
+@dataclass
 class CameraDefinition:
     """Definition of a camera from config."""
 
@@ -26,15 +45,18 @@ class CameraDefinition:
     resolution: Tuple[int, int]  # (height, width)
     rotate: Optional[int] = None  # 90, 180, 270, or None
     centermark: bool = False
+    title: Optional[TitleConfig] = None  # Optional title at bottom left
 
     @classmethod
     def from_dict(cls, name: str, data: Dict) -> CameraDefinition:
         res = data.get("resolution", [480, 640])
+        title = TitleConfig.from_dict(data.get("title"))
         return cls(
             name=name,
             resolution=(res[0], res[1]),
             rotate=data.get("rotate"),
             centermark=data.get("centermark", False),
+            title=title,
         )
 
 

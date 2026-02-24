@@ -218,6 +218,7 @@ class MultiViewComposer:
                 self.config,
                 tree_index,
                 cam.centermark,
+                cam.title,
             )
 
             # Draw border

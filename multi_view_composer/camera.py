@@ -5,7 +5,7 @@ from typing import Optional, Tuple, List, Dict
 import numpy as np
 import cv2
 
-from .config import CameraDefinition
+from .config import CameraDefinition, TitleConfig
 
 
 # Rotation mapping: degrees to OpenCV constant
@@ -25,6 +25,7 @@ class CameraConfig:
     resolution: Tuple[int, int, int]  # (height, width, channels)
     rotate: Optional[int]  # cv2 rotation constant or None
     centermark: bool
+    title: Optional[TitleConfig] = None  # Optional title at bottom left
 
     # Computed target sizes for each layout (set during initialization)
     target_sizes: List[Tuple[int, int]] = field(default_factory=list)
@@ -65,6 +66,7 @@ def create_camera_configs(
             resolution=(h, w, 3),
             rotate=rotate_cv,
             centermark=definition.centermark,
+            title=definition.title,
             target_sizes=[(h, w)] * num_layouts,
             processed_images=[None] * num_layouts,
         )
