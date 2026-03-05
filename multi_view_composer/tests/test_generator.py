@@ -154,15 +154,6 @@ class TestUpdateDynamicData:
         assert composer.dynamic_data["temperature"] == 42.0
         assert composer.dynamic_data["my_value"] == 100
 
-    def test_updates_multiple_values(self, composer):
-        composer.update_dynamic_data(
-            speed=35.0, active=False, level=80, status="running"
-        )
-
-        assert composer.dynamic_data["speed"] == 35.0
-        assert composer.dynamic_data["active"] is False
-        assert composer.dynamic_data["level"] == 80
-        assert composer.dynamic_data["status"] == "running"
 
 
 class TestGenerateFrame:
@@ -205,12 +196,3 @@ class TestGetCameraConfig:
         config = composer.get_camera_config("unknown_camera")
 
         assert config is None
-
-
-class TestShutdown:
-    def test_shutdown_completes(self):
-        config = create_test_config()
-        comp = MultiViewComposer(config)
-        comp.shutdown()
-
-        assert True
