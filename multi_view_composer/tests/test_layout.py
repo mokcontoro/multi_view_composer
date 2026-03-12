@@ -8,9 +8,7 @@ from multi_view_composer import (
     hconcat_resize,
     create_placeholder,
     build_layout_from_config,
-    compute_layout_from_config,
     LayoutManager,
-    LayoutNode,
     Direction,
 )
 from multi_view_composer.config import LayoutNodeConfig
@@ -48,7 +46,6 @@ class TestVconcatResize:
         assert result.shape[1] == 640
 
 
-
 class TestHconcatResize:
     def test_same_height(self, image_480x640):
         img1 = image_480x640.copy()
@@ -67,7 +64,6 @@ class TestHconcatResize:
 
         # Should resize to match shorter height (480)
         assert result.shape[0] == 480
-
 
 
 class TestCreatePlaceholder:

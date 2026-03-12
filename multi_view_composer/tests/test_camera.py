@@ -1,6 +1,5 @@
 """Tests for camera module."""
 
-import pytest
 import cv2
 
 from multi_view_composer.camera import CameraConfig, create_camera_configs, ROTATION_MAP
@@ -106,8 +105,12 @@ class TestCreateCameraConfigs:
 
     def test_centermark_flag(self):
         definitions = {
-            "cam1": CameraDefinition(name="cam1", resolution=(480, 640), centermark=True),
-            "cam2": CameraDefinition(name="cam2", resolution=(480, 640), centermark=False),
+            "cam1": CameraDefinition(
+                name="cam1", resolution=(480, 640), centermark=True
+            ),
+            "cam2": CameraDefinition(
+                name="cam2", resolution=(480, 640), centermark=False
+            ),
         }
         configs = create_camera_configs(definitions, num_layouts=1)
 

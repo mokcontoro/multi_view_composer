@@ -155,7 +155,6 @@ class TestUpdateDynamicData:
         assert composer.dynamic_data["my_value"] == 100
 
 
-
 class TestGenerateFrame:
     def test_generates_single_frame(self, composer, sample_image):
         composer.update_camera_image("cam1", sample_image, active=True)

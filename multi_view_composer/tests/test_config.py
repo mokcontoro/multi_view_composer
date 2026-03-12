@@ -321,21 +321,25 @@ text_overlays:
 
 class TestVariableParsing:
     def test_formula_type(self):
-        var = VariableConfig.from_dict({
-            "type": "formula",
-            "expr": "{speed} * 3.6",
-        })
+        var = VariableConfig.from_dict(
+            {
+                "type": "formula",
+                "expr": "{speed} * 3.6",
+            }
+        )
         assert var.type == "formula"
         assert var.expr == "{speed} * 3.6"
 
     def test_conditional_type(self):
-        var = VariableConfig.from_dict({
-            "type": "conditional",
-            "conditions": [
-                {"when": "{mode} == 'auto'", "value": "AUTO"},
-                {"else": "STANDBY"},
-            ],
-        })
+        var = VariableConfig.from_dict(
+            {
+                "type": "conditional",
+                "conditions": [
+                    {"when": "{mode} == 'auto'", "value": "AUTO"},
+                    {"else": "STANDBY"},
+                ],
+            }
+        )
         assert var.type == "conditional"
         assert len(var.conditions) == 2
         assert var.conditions[0].when == "{mode} == 'auto'"

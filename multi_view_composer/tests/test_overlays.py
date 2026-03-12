@@ -11,7 +11,6 @@ from multi_view_composer.config import (
     TitleConfig,
     OverlayStyle,
     TextOverlayConfig,
-    VariableConfig,
     ColorRule,
 )
 
