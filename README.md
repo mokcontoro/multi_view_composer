@@ -32,6 +32,7 @@ python examples/example.py --debug
 # Run benchmark
 python examples/benchmark.py -n 100
 ```
+
 ## Uninstallation
 
 ```bash
@@ -108,11 +109,12 @@ active_layout: main
 
 Visual result:
 ```
-+----------+----------+
-| cam_top  |          |
-+----------+ cam_right|
-|cam_bottom|          |
-+----------+----------+
++--------+--------------+
+| cam_top|              |
++--------+   cam_right  |
+|cam_bot.|              |
++--------+--------------+
+  (40%)       (60%)
 ```
 
 ### Text Overlays
