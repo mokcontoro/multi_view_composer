@@ -4,9 +4,9 @@ A high-performance multi-view image composer with configurable text overlays and
 
 ## Features
 
-- **Custom camera definitions** - define any cameras with resolution and rotation
+- **Custom camera definitions** - define any cameras with resolution, rotation, and title
 - **Fully configurable text overlays** - templates, computed variables, conditional colors
-- **Flexible layout system** - tree-based horizontal/vertical arrangements
+- **Flexible layout system** - tree-based horizontal/vertical arrangements with weighted sizing
 - **Any dynamic data** - pass any variables via `update_dynamic_data()`
 - **YAML validation** - helpful error messages for configuration issues
 - **Logging support** - configurable logging for debugging
@@ -15,7 +15,7 @@ A high-performance multi-view image composer with configurable text overlays and
 ## Installation
 
 ```bash
-git clone https://github.com/mokcontoro/multi_view_composer.git
+git clone https://github.com/contoroinc/multi_view_composer.git
 cd multi_view_composer/
 pip install ./
 ```
@@ -32,6 +32,7 @@ python examples/example.py --debug
 # Run benchmark
 python examples/benchmark.py -n 100
 ```
+
 ## Uninstallation
 
 ```bash
@@ -76,10 +77,14 @@ Define cameras with their resolution and optional rotation:
 cameras:
   cam_left:
     resolution: [480, 640]  # height, width
+    title: "Left Camera"    # Optional: simple string (50% opacity)
   cam_right:
     resolution: [480, 640]
     rotate: 90              # Optional: 90, 180, 270, -90
     centermark: true        # Optional: draw crosshair
+    title:                  # Optional: detailed title config
+      text: "Right Camera"
+      opacity: 0.7          # Background opacity (0.0-1.0, default 0.5)
 ```
 
 ### Layouts
@@ -92,21 +97,24 @@ layouts:
     direction: horizontal
     children:
       - direction: vertical
+        weight: 0.4           # Optional: 40% of parent width
         children:
           - camera: cam_top
           - camera: cam_bottom
       - camera: cam_right
+        weight: 0.6           # Optional: 60% of parent width
 
 active_layout: main
 ```
 
 Visual result:
 ```
-+----------+----------+
-| cam_top  |          |
-+----------+ cam_right|
-|cam_bottom|          |
-+----------+----------+
++--------+--------------+
+| cam_top|              |
++--------+   cam_right  |
+|cam_bot.|              |
++--------+--------------+
+  (40%)       (60%)
 ```
 
 ### Text Overlays
@@ -286,11 +294,26 @@ from multi_view_composer import (
     # Main class
     MultiViewComposer,
 
+    # Camera
+    CameraConfig, CameraDefinition, create_camera_configs,
+
+    # Overlays
+    draw_centermark, draw_camera_overlays, draw_border, draw_camera_title,
+
+    # Layout
+    LayoutManager, LayoutNode, Direction,
+    hconcat_resize, vconcat_resize, create_placeholder,
+    build_layout_from_config, compute_layout_from_config,
+
     # Configuration
-    ViewerConfig, CameraDefinition, OverlayStyle,
+    ViewerConfig, OverlayStyle,
     TextOverlayConfig, ColorRule, VariableConfig,
-    CentermarkConfig, BorderConfig, LayoutNodeConfig,
+    CentermarkConfig, BorderConfig, TitleConfig, LayoutNodeConfig,
     ConfigError, load_config,
+
+    # Template Engine
+    evaluate_condition, evaluate_formula, resolve_variable,
+    render_template, evaluate_color_rules, build_context,
 
     # Logging
     setup_logging, get_logger,
