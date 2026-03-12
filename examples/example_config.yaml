@@ -14,6 +14,8 @@ cameras:
   cam_bottom_left:
     resolution: [240, 320]
     title: "Bottom Left"  # Simple string form (uses default 50% opacity)
+    rotate: 90  # Rotate 90 degrees clockwise
+    centermark: true  # Enable crosshair on this camera
   cam_right:
     resolution: [480, 320]
     title:
@@ -38,6 +40,16 @@ layouts:
         children:
           - camera: cam_top_left
           - camera: cam_bottom_left
+        weight: 0.4  # Left column takes 40% of width
+      - camera: cam_right
+        weight: 0.6  # Right camera takes 60% of width
+
+  # Second layout: all cameras stacked vertically
+  stacked:
+    direction: vertical
+    children:
+      - camera: cam_top_left
+      - camera: cam_bottom_left
       - camera: cam_right
 
 active_layout: main

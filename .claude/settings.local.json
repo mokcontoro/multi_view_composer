@@ -18,7 +18,9 @@
       "Bash(git restore:*)",
       "Bash(timeout:*)",
       "Bash(git mv:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(which python3:*)",
+      "Bash(python3 -m pytest multi_view_composer/tests/ -v 2>&1)"
     ]
   }
 }
